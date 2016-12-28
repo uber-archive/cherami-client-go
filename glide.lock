@@ -1,8 +1,8 @@
 hash: af047361c4b9178f93fda3c1c7f7b06d7abd462e48183c1fe36bbea933b38933
-updated: 2016-12-27T08:53:57.896554928-08:00
+updated: 2016-12-28T13:59:38.738778828-08:00
 imports:
 - name: github.com/apache/thrift
-  version: f39d4c8535472db962930fb22d733a4f32ed6fc1
+  version: 366e89ead7df34b4132c2accb59dc14fce564883
   subpackages:
   - lib/go/thrift
 - name: github.com/cactus/go-statsd-client
@@ -42,7 +42,7 @@ imports:
 - name: github.com/uber-go/atomic
   version: 3b8db5e93c4c02efbc313e17b2e796b0914a01fb
 - name: github.com/uber/cherami-thrift
-  version: 07226f4510ac9818d905a94708b8dcbe9dc24cc0
+  version: 261ac57f2bbd3b265dc1c30283a08d6ca540b45d
   subpackages:
   - .generated/go/cherami
 - name: github.com/uber/tchannel-go
