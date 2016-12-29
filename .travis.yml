@@ -13,10 +13,3 @@ install:
 
 script:
  - make cover_ci
-
-notifications:
-  email:
-    recipients:
-      - cherami@uber.com
-    on_success: always 
-    on_failure: always
