@@ -50,4 +50,6 @@ cover: cover_profile
 	done
 
 cover_ci: cover_profile
-	goveralls -coverprofile=$(BUILD)/coverage.out -service=travis-ci || echo -e "\x1b[31mCoveralls failed\x1b[m"
+	@for dir in $(TEST_DIRS); do \
+		goveralls -coverprofile=$(BUILD)/"$$dir"/coverage.out -service=travis-ci || echo -e "\x1b[31mCoveralls failed\x1b[m"; \
+	done
