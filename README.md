@@ -1,4 +1,4 @@
-Go client library for Cherami [![Build Status](https://travis-ci.org/uber/cherami-client-go.svg?branch=master)]https://travis-ci.org/uber/cherami-client-go) [![Coverage Status](https://coveralls.io/repos/uber/cherami-client-go/badge.svg?branch=master&service=github)](https://coveralls.io/github/uber/cherami-client-go?branch=master)
+Go client library for Cherami [![Build Status](https://travis-ci.org/uber/cherami-client-go.svg?branch=master)](https://travis-ci.org/uber/cherami-client-go) [![Coverage Status](https://coveralls.io/repos/uber/cherami-client-go/badge.svg?branch=master&service=github)](https://coveralls.io/github/uber/cherami-client-go?branch=master)
 =============================
 
 [Cherami](https://eng.uber.com/cherami/) is a distributed, scalable, durable, and highly available message queue system we developed at Uber Engineering to transport asynchronous tasks.
