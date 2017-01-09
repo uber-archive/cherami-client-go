@@ -22,31 +22,38 @@ package cherami
 
 import (
 	"errors"
+	"math/rand"
 	"net"
 	"sync"
 	"sync/atomic"
 	"time"
 
-	"github.com/pborman/uuid"
 	"github.com/uber-common/bark"
 	"github.com/uber/tchannel-go"
 	"github.com/uber/tchannel-go/thrift"
 
-	"github.com/uber/cherami-thrift/.generated/go/cherami"
 	"github.com/uber/cherami-client-go/common"
 	"github.com/uber/cherami-client-go/common/backoff"
 	"github.com/uber/cherami-client-go/common/metrics"
+	"github.com/uber/cherami-thrift/.generated/go/cherami"
 )
 
 type (
+	// endpoints represents the current
+	// set of host:port addresses that
+	// should be used for publishing
+	endpoints struct {
+		addrs              []string                    // list of ip:ports
+		addrToThriftClient map[string]cherami.TChanBIn // ip:port to thriftClient
+	}
+
 	tchannelBatchPublisher struct {
 		basePublisher
 		sync.RWMutex
 		opened         int32
 		closed         int32
 		tchan          *tchannel.Channel
-		endpoints      map[string]struct{}
-		thriftClient   cherami.TChanBIn
+		endpoints      atomic.Value // atomically refreshed by reconfigHandler
 		reconfigureCh  chan reconfigureInfo
 		reconfigurable *reconfigurable
 		messagesCh     chan *putMessageRequest
@@ -57,6 +64,7 @@ type (
 var errInvalidAckID = errors.New("invalid msg id found in ack")
 var errPublisherClosed = errors.New("publisher is closed")
 var errPublisherUnopened = errors.New("publish is not open")
+var errNoPublishEndpoint = errors.New("no publish endpoints")
 
 const (
 	maxBatchSize              = 16 // max number of messages in a single batch to server
@@ -68,7 +76,7 @@ const (
 
 var _ Publisher = (*tchannelBatchPublisher)(nil)
 
-func newTChannelBatchPublisher(client Client, path string, logger bark.Logger, metricsReporter metrics.Reporter) Publisher {
+func newTChannelBatchPublisher(client Client, tchan *tchannel.Channel, path string, logger bark.Logger, metricsReporter metrics.Reporter) Publisher {
 	base := basePublisher{
 		client:      client,
 		retryPolicy: createDefaultPublisherRetryPolicy(),
@@ -78,10 +86,10 @@ func newTChannelBatchPublisher(client Client, path string, logger bark.Logger, m
 	}
 	return &tchannelBatchPublisher{
 		basePublisher: base,
+		tchan:         tchan,
 		reconfigureCh: make(chan reconfigureInfo, 1),
 		messagesCh:    make(chan *putMessageRequest, maxBatchSize),
 		closeCh:       make(chan struct{}),
-		endpoints:     make(map[string]struct{}, endpointsInitialSz),
 	}
 }
 
@@ -101,30 +109,27 @@ func (p *tchannelBatchPublisher) Open() error {
 		return err
 	}
 
-	ch, err := tchannel.NewChannel(uuid.New(), nil)
-	if err != nil {
-		return err
-	}
-
-	p.tchan = ch
 	p.checksumOption = publisherOptions.GetChecksumOption()
 
-	_, addrs := p.choosePublishEndpoints(publisherOptions)
-	for _, addr := range addrs {
+	endpoints := newEndpoints()
+
+	_, hostAddrs := p.choosePublishEndpoints(publisherOptions)
+	for _, addr := range hostAddrs {
 		key := net.JoinHostPort(addr.GetHost(), inputServiceTChannelPort)
-		p.endpoints[key] = struct{}{}
-		p.tchan.Peers().Add(key)
+		if _, ok := endpoints.addrToThriftClient[key]; !ok {
+			endpoints.addrs = append(endpoints.addrs, key)
+			endpoints.addrToThriftClient[key] = p.newThriftClient(key)
+		}
 	}
 
-	p.thriftClient = cherami.NewTChanBInClient(thrift.NewClient(p.tchan, common.InputServiceName, nil))
-
-	p.reporter.UpdateGauge(metrics.PublishNumConnections, nil, int64(len(addrs)))
+	p.endpoints.Store(endpoints)
+	p.reporter.UpdateGauge(metrics.PublishNumConnections, nil, int64(len(hostAddrs)))
 
 	p.reconfigurable = newReconfigurable(p.reconfigureCh, p.closeCh, p.reconfigureHandler, p.logger)
 	go p.reconfigurable.reconfigurePump()
 	go p.processor()
 	atomic.StoreInt32(&p.opened, 1)
-	p.logger.WithField(`endpoints`, addrs).Info("Publisher Opened.")
+	p.logger.WithField(`endpoints`, endpoints.addrs).Info("Publisher Opened.")
 
 	return nil
 }
@@ -141,9 +146,6 @@ func (p *tchannelBatchPublisher) Close() {
 	}
 
 	close(p.closeCh)
-	if p.tchan != nil {
-		p.tchan.Close()
-	}
 
 	p.drain()
 	p.reporter.UpdateGauge(metrics.PublishNumConnections, nil, int64(0))
@@ -258,7 +260,13 @@ func (p *tchannelBatchPublisher) publishBatch(putMessages []*cherami.PutMessage)
 func (p *tchannelBatchPublisher) putMessageBatch(request *cherami.PutMessageBatchRequest) (*cherami.PutMessageBatchResult_, error) {
 	ctx, cancel := thrift.NewContext(messageBatchThriftTimeout)
 	defer cancel()
-	return p.thriftClient.PutMessageBatch(ctx, request)
+	endpoints := p.endpoints.Load().(*endpoints)
+	if len(endpoints.addrs) == 0 {
+		return nil, errNoPublishEndpoint
+	}
+	addr := endpoints.addrs[rand.Intn(len(endpoints.addrs))]
+	thriftClient, _ := endpoints.addrToThriftClient[addr]
+	return thriftClient.PutMessageBatch(ctx, request)
 }
 
 // processAcks takes a set of acks received in response
@@ -363,24 +371,26 @@ func (p *tchannelBatchPublisher) reconfigureHandler() {
 		}
 	}
 
-	newEndpoints := make(map[string]struct{}, endpointsInitialSz)
+	currEndpoints := newEndpoints()
+	oldEndpoints := p.endpoints.Load().(*endpoints)
+
 	_, addrs := p.choosePublishEndpoints(publisherOptions)
 	for _, addr := range addrs {
+
 		key := net.JoinHostPort(addr.GetHost(), inputServiceTChannelPort)
-		if _, ok := p.endpoints[key]; !ok {
-			p.tchan.Peers().Add(key)
-		} else {
-			delete(p.endpoints, key)
+		_, ok := oldEndpoints.addrToThriftClient[key]
+		if ok {
+			currEndpoints.addrs = append(currEndpoints.addrs, key)
+			currEndpoints.addrToThriftClient[key] = oldEndpoints.addrToThriftClient[key]
+			continue
 		}
-		newEndpoints[key] = struct{}{}
+
+		currEndpoints.addrs = append(currEndpoints.addrs, key)
+		currEndpoints.addrToThriftClient[key] = p.newThriftClient(key)
 	}
 
-	for addr := range p.endpoints {
-		p.tchan.Peers().Remove(addr)
-	}
-
-	p.endpoints = newEndpoints
-	p.reporter.UpdateGauge(metrics.PublishNumConnections, nil, int64(len(p.endpoints)))
+	p.endpoints.Store(currEndpoints)
+	p.reporter.UpdateGauge(metrics.PublishNumConnections, nil, int64(len(currEndpoints.addrs)))
 }
 
 func (p *tchannelBatchPublisher) isClosed() bool {
@@ -399,6 +409,18 @@ func (p *tchannelBatchPublisher) drain() {
 		default:
 			return
 		}
+	}
+}
+
+func (p *tchannelBatchPublisher) newThriftClient(addr string) cherami.TChanBIn {
+	options := &thrift.ClientOptions{HostPort: addr}
+	return cherami.NewTChanBInClient(thrift.NewClient(p.tchan, common.InputServiceName, options))
+}
+
+func newEndpoints() *endpoints {
+	return &endpoints{
+		addrs:              make([]string, 0, endpointsInitialSz),
+		addrToThriftClient: make(map[string]cherami.TChanBIn, endpointsInitialSz),
 	}
 }
 
