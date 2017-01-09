@@ -31,10 +31,10 @@ import (
 	"github.com/stretchr/testify/suite"
 	"github.com/uber-common/bark"
 
-	"github.com/uber/cherami-thrift/.generated/go/cherami"
 	"github.com/uber/cherami-client-go/common"
 	"github.com/uber/cherami-client-go/common/metrics"
 	mc "github.com/uber/cherami-client-go/mocks/clients/cherami"
+	"github.com/uber/cherami-thrift/.generated/go/cherami"
 )
 
 type (
@@ -55,7 +55,7 @@ func (s *TChanBatchPublisherSuite) SetupTest() {
 	s.Assertions = require.New(s.T()) // Have to define our overridden assertions in the test setup. If we did it earlier, s.T() will return nil
 	s.logger = bark.NewLoggerFromLogrus(log.StandardLogger())
 	s.client = new(mockClient)
-	s.publisher = newTChannelBatchPublisher(s.client, "/test/tchanBatchPublisher", s.logger, metrics.NewNullReporter()).(*tchannelBatchPublisher)
+	s.publisher = newTChannelBatchPublisher(s.client, nil, "/test/tchanBatchPublisher", s.logger, metrics.NewNullReporter()).(*tchannelBatchPublisher)
 	s.publisher.opened = 1
 }
 
@@ -73,7 +73,12 @@ func (s *TChanBatchPublisherSuite) TestPublishBatchSuccess() {
 		result := newBatchResult(ackIDs, []string{})
 		mockInput := new(mc.MockTChanBInClient)
 		mockInput.On("PutMessageBatch", mock.Anything, mock.Anything).Return(result, nil).Times((sz + 15) / 16)
-		s.publisher.thriftClient = mockInput
+
+		endpoints := newEndpoints()
+		key := "127.0.0.1:4240"
+		endpoints.addrs = append(endpoints.addrs, key)
+		endpoints.addrToThriftClient[key] = mockInput
+		s.publisher.endpoints.Store(endpoints)
 
 		msg := newPublisherMessage()
 		ids := make([]string, sz)
@@ -114,7 +119,12 @@ func (s *TChanBatchPublisherSuite) TestPublishBatchFailure() {
 		result := newBatchResult([]string{}, ackIDs)
 		mockInput := new(mc.MockTChanBInClient)
 		mockInput.On("PutMessageBatch", mock.Anything, mock.Anything).Return(result, nil).Times((sz + 15) / 16)
-		s.publisher.thriftClient = mockInput
+
+		endpoints := newEndpoints()
+		key := "127.0.0.1:4240"
+		endpoints.addrs = append(endpoints.addrs, key)
+		endpoints.addrToThriftClient[key] = mockInput
+		s.publisher.endpoints.Store(endpoints)
 
 		msg := newPublisherMessage()
 		ids := make([]string, sz)
@@ -161,7 +171,12 @@ func (s *TChanBatchPublisherSuite) TestPublishBatchPartialFailure() {
 	result := newBatchResult(succIDs, failIDs)
 	mockInput := new(mc.MockTChanBInClient)
 	mockInput.On("PutMessageBatch", mock.Anything, mock.Anything).Return(result, nil).Times((sz + 15) / 16)
-	s.publisher.thriftClient = mockInput
+
+	endpoints := newEndpoints()
+	key := "127.0.0.1:4240"
+	endpoints.addrs = append(endpoints.addrs, key)
+	endpoints.addrToThriftClient[key] = mockInput
+	s.publisher.endpoints.Store(endpoints)
 
 	msg := newPublisherMessage()
 	ids := make([]string, sz)

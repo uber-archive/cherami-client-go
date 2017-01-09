@@ -27,10 +27,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/uber/cherami-thrift/.generated/go/cherami"
 	"github.com/uber/cherami-client-go/common"
 	"github.com/uber/cherami-client-go/common/backoff"
 	"github.com/uber/cherami-client-go/common/metrics"
+	"github.com/uber/cherami-thrift/.generated/go/cherami"
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/pborman/uuid"
@@ -257,7 +257,7 @@ func (c *clientImpl) CreatePublisher(request *CreatePublisherRequest) Publisher 
 	case PublisherTypeStreaming:
 		return NewPublisher(c, request.Path, request.MaxInflightMessagesPerConnection)
 	case PublisherTypeNonStreaming:
-		return newTChannelBatchPublisher(c, request.Path, c.options.Logger, c.options.MetricsReporter)
+		return newTChannelBatchPublisher(c, c.connection, request.Path, c.options.Logger, c.options.MetricsReporter)
 	}
 	return nil
 }
