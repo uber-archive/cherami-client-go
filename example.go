@@ -21,6 +21,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"os"
 	"runtime/debug"
@@ -29,12 +30,10 @@ import (
 	cthrift "github.com/uber/cherami-thrift/.generated/go/cherami"
 	"github.com/uber/cherami-client-go/client/cherami"
 	"github.com/apache/thrift/lib/go/thrift"
-	"github.com/uber/tchannel-go"
 )
 
-const (
-	port = 4922 // cherami-frontend running on this port by default
-)
+var host = flag.String("host", "127.0.0.1", "cherami-frontend host IP")
+var port = flag.Int("port", 4922, "cherami-frontend port")
 
 // helper function to print out a thrift object in json
 func jsonify(obj thrift.TStruct) string {
@@ -55,12 +54,11 @@ func exitIfError(err error) {
 }
 
 func main() {
-	// get the IP address of the interface
-	host, _ := tchannel.ListenIP()
+	flag.Parse()
 
 	// First, create the client to interact with Cherami
 	// Here we directly connect to cherami running on host:port
-	cClient, err := cherami.NewClient("cherami-example", host.String(), port, &cherami.ClientOptions{
+	cClient, err := cherami.NewClient("cherami-example", *host, *port, &cherami.ClientOptions{
 		Timeout: time.Minute,
 	})
 	exitIfError(err)
