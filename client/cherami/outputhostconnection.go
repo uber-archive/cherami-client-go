@@ -26,10 +26,10 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/uber/cherami-thrift/.generated/go/cherami"
 	"github.com/uber/cherami-client-go/common"
 	"github.com/uber/cherami-client-go/common/metrics"
 	"github.com/uber/cherami-client-go/stream"
+	"github.com/uber/cherami-thrift/.generated/go/cherami"
 
 	"github.com/uber-common/bark"
 	"github.com/uber/tchannel-go/thrift"
@@ -38,7 +38,6 @@ import (
 
 type (
 	outputHostConnection struct {
-		outputHostClient  cherami.TChanBOut
 		ackClient         cherami.TChanBOut
 		wsConnector       WSConnector
 		path              string
@@ -74,7 +73,7 @@ const (
 	ackBatchDelay   = time.Second / 10
 )
 
-func newOutputHostConnection(client cherami.TChanBOut, ackClient cherami.TChanBOut, wsConnector WSConnector,
+func newOutputHostConnection(ackClient cherami.TChanBOut, wsConnector WSConnector,
 	path, consumerGroupName string, options *ClientOptions, deliveryCh chan<- Delivery,
 	reconfigureCh chan<- reconfigureInfo, connKey string, protocol cherami.Protocol,
 	prefetchSize int32, logger bark.Logger, reporter metrics.Reporter) *outputHostConnection {
@@ -90,7 +89,6 @@ func newOutputHostConnection(client cherami.TChanBOut, ackClient cherami.TChanBO
 	return &outputHostConnection{
 		connKey:           connKey,
 		protocol:          protocol,
-		outputHostClient:  client,
 		ackClient:         ackClient,
 		wsConnector:       wsConnector,
 		path:              path,
@@ -161,7 +159,7 @@ func (conn *outputHostConnection) close() {
 		}
 
 		close(conn.closeChannel)
-
+		conn.closeAcksBatchCh() // necessary to shutdown writeAcksPump within the connection
 		atomic.StoreInt32(&conn.closed, 1)
 		conn.logger.Info("Output host connection closed.")
 	}
@@ -175,7 +173,20 @@ func (conn *outputHostConnection) isClosed() bool {
 	return atomic.LoadInt32(&conn.closed) != 0
 }
 
+func (conn *outputHostConnection) drain() {
+	for {
+		if _, err := conn.outputHostStream.Read(); err != nil {
+			return
+		}
+	}
+}
+
 func (conn *outputHostConnection) readMessagesPump() {
+
+	defer func() {
+		conn.logger.Info("readMessagesPump done")
+	}()
+
 	var localCredits int32
 	for {
 		conn.reporter.UpdateGauge(metrics.ConsumeLocalCredits, nil, int64(localCredits))
@@ -193,7 +204,6 @@ func (conn *outputHostConnection) readMessagesPump() {
 		if err != nil {
 			// Error reading from stream.  Time to close and bail out.
 			conn.logger.Infof("Error reading OutputHost Message Stream: %v", err)
-
 			// Stream is closed.  Close the connection and bail out
 			conn.close()
 			return
@@ -203,7 +213,15 @@ func (conn *outputHostConnection) readMessagesPump() {
 			conn.reporter.IncCounter(metrics.ConsumeMessageRate, nil, 1)
 			msg := cmd.Message
 			delivery := newDelivery(msg, conn)
-			conn.deliveryCh <- delivery
+
+			select {
+			case conn.deliveryCh <- delivery:
+			case <-conn.closeChannel:
+				conn.logger.Info("close signal received, initiating readPump drain")
+				conn.drain()
+				return
+			}
+
 			localCredits++
 		} else if cmd.GetType() == cherami.OutputHostCommandType_RECONFIGURE {
 			conn.reporter.IncCounter(metrics.ConsumeReconfigureRate, nil, 1)
