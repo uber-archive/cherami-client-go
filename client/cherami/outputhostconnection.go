@@ -173,6 +173,9 @@ func (conn *outputHostConnection) isClosed() bool {
 	return atomic.LoadInt32(&conn.closed) != 0
 }
 
+// drain reads and discards all messages on
+// the outputHostStream until it encounters
+// a read stream error
 func (conn *outputHostConnection) drain() {
 	for {
 		if _, err := conn.outputHostStream.Read(); err != nil {
