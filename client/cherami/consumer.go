@@ -26,9 +26,9 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/uber/cherami-thrift/.generated/go/cherami"
 	"github.com/uber/cherami-client-go/common"
 	"github.com/uber/cherami-client-go/common/metrics"
+	"github.com/uber/cherami-thrift/.generated/go/cherami"
 	"github.com/uber/tchannel-go"
 	"github.com/uber/tchannel-go/thrift"
 
@@ -41,7 +41,6 @@ type (
 		path              string
 		consumerGroupName string
 		consumerName      string
-		streamConnection  *tchannel.Channel
 		ackConnection     *tchannel.Channel
 		prefetchSize      int
 		options           *ClientOptions
@@ -114,12 +113,6 @@ func (c *consumerImpl) Open(deliveryCh chan Delivery) (chan Delivery, error) {
 			return nil, err
 		}
 
-		streamCh, err := tchannel.NewChannel(uuid.New(), nil)
-		if err != nil {
-			return nil, err
-		}
-		c.streamConnection = streamCh
-
 		// Create a separate connection for ack messages call
 		ackCh, err := tchannel.NewChannel(uuid.New(), nil)
 		if err != nil {
@@ -147,7 +140,7 @@ func (c *consumerImpl) Open(deliveryCh chan Delivery) (chan Delivery, error) {
 				conn, err := c.createOutputHostConnection(common.GetConnectionKey(tchanHostAddresses[idx]), connKey, chosenProtocol)
 				if err != nil {
 					if conn != nil {
-						closeConnection(conn)
+						conn.close()
 					}
 
 					c.logger.Errorf("Error opening outputhost connection on %v:%v: %v", host.GetHost(), host.GetPort(), err)
@@ -186,14 +179,11 @@ func (c *consumerImpl) Close() {
 	defer c.lk.Unlock()
 	if c.connections != nil {
 		for _, outputHostConn := range c.connections {
-			closeConnection(outputHostConn)
+			outputHostConn.close()
 		}
 		c.reporter.UpdateGauge(metrics.ConsumeNumConnections, nil, 0)
 	}
 
-	if c.streamConnection != nil {
-		c.streamConnection.Close()
-	}
 	if c.ackConnection != nil {
 		c.ackConnection.Close()
 	}
@@ -260,7 +250,7 @@ func (c *consumerImpl) reconfigureConsumer() {
 		for existingConnKey, existingConn := range c.connections {
 			if existingConn.isClosed() {
 				c.logger.WithField(common.TagHostIP, common.FmtHostIP(existingConnKey)).Info("Removing closed connection from cache.")
-				closeConnection(existingConn)
+				existingConn.close()
 				delete(c.connections, existingConnKey)
 				c.logger.WithField(common.TagHostIP, common.FmtHostIP(existingConn.connKey)).Info("Removed connection from cache.")
 			}
@@ -278,7 +268,7 @@ func (c *consumerImpl) reconfigureConsumer() {
 				if err != nil {
 					connLogger.Info("Error creating connection to OutputHost after reconfiguration.")
 					if conn != nil {
-						closeConnection(conn)
+						conn.close()
 					}
 				} else {
 					connLogger.Info("Successfully created connection to OutputHost after reconfiguration.")
@@ -296,7 +286,7 @@ func (c *consumerImpl) reconfigureConsumer() {
 			if _, ok := currentHosts[host]; !ok {
 				connLogger := c.logger.WithField(common.TagHostIP, common.FmtHostIP(outputHostConn.connKey))
 				connLogger.Info("Closing connection to OutputHost after reconfiguration.")
-				closeConnection(outputHostConn)
+				outputHostConn.close()
 			}
 		}
 
@@ -314,13 +304,6 @@ func (c *consumerImpl) reconfigureConsumer() {
 func (c *consumerImpl) createOutputHostConnection(tchanHostPort string, connKey string, protocol cherami.Protocol) (*outputHostConnection, error) {
 	connLogger := c.logger.WithField(common.TagHostIP, common.FmtHostIP(connKey))
 
-	// TODO [ljj] to be removed once moved to websocket
-	client, err := createOutputHostClient(c.streamConnection, connKey)
-	if err != nil {
-		connLogger.Infof("Error creating OutputHost client: %v", err)
-		return nil, err
-	}
-
 	// We use a separate connection for acks to make sure response for acks won't get blocked behind streaming messages
 	ackClient, err := createOutputHostClient(c.ackConnection, tchanHostPort)
 	if err != nil {
@@ -328,7 +311,7 @@ func (c *consumerImpl) createOutputHostConnection(tchanHostPort string, connKey 
 		return nil, err
 	}
 
-	conn := newOutputHostConnection(client, ackClient, c.wsConnector, c.path, c.consumerGroupName, c.options, c.deliveryCh,
+	conn := newOutputHostConnection(ackClient, c.wsConnector, c.path, c.consumerGroupName, c.options, c.deliveryCh,
 		c.reconfigureCh, connKey, protocol, int32(c.prefetchSize), connLogger, c.reporter)
 
 	// Now open the connection
@@ -404,10 +387,4 @@ func createOutputHostClient(ch *tchannel.Channel, hostPort string) (cherami.TCha
 	client := cherami.NewTChanBOutClient(tClient)
 
 	return client, nil
-}
-
-func closeConnection(conn *outputHostConnection) {
-	conn.close()
-	// This is necessary to shutdown writeAcksPump within the connection
-	conn.closeAcksBatchCh()
 }
