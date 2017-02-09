@@ -41,11 +41,11 @@ type (
 		connClosedHandler  func(host string)
 		closingCh          chan struct{}
 		logger             bark.Logger
+		pollingInterval    time.Duration
 	}
 )
 
 const (
-	heartbeatDuration       = time.Second * 10
 	reconfigureChBufferSize = 1
 	limiterDuration         = time.Millisecond * 500
 )
@@ -56,12 +56,13 @@ const (
 )
 
 func newReconfigurable(reconfigureCh <-chan reconfigureInfo, closingCh chan struct{}, reconfigureHandler func(),
-	logger bark.Logger) *reconfigurable {
+	logger bark.Logger, pollingInterval time.Duration) *reconfigurable {
 	r := &reconfigurable{
 		reconfigureCh:      reconfigureCh,
 		closingCh:          closingCh,
 		reconfigureHandler: reconfigureHandler,
 		logger:             logger,
+		pollingInterval:    pollingInterval,
 	}
 
 	return r
@@ -69,7 +70,7 @@ func newReconfigurable(reconfigureCh <-chan reconfigureInfo, closingCh chan stru
 
 func (s *reconfigurable) reconfigurePump() {
 	s.logger.Info("Reconfiguration pump started.")
-	heartbeat := time.NewTicker(heartbeatDuration)
+	heartbeat := time.NewTicker(s.pollingInterval)
 	limiter := time.NewTicker(limiterDuration)
 	lastReconfigureID := ""
 	for {

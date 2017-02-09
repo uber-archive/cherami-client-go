@@ -76,13 +76,14 @@ const (
 
 var _ Publisher = (*tchannelBatchPublisher)(nil)
 
-func newTChannelBatchPublisher(client Client, tchan *tchannel.Channel, path string, logger bark.Logger, metricsReporter metrics.Reporter) Publisher {
+func newTChannelBatchPublisher(client *clientImpl, tchan *tchannel.Channel, path string, logger bark.Logger, metricsReporter metrics.Reporter) Publisher {
 	base := basePublisher{
-		client:      client,
-		retryPolicy: createDefaultPublisherRetryPolicy(),
-		path:        path,
-		logger:      logger.WithField(common.TagDstPth, common.FmtDstPth(path)),
-		reporter:    metricsReporter,
+		client:      			client,
+		retryPolicy: 			createDefaultPublisherRetryPolicy(),
+		path:				path,
+		logger:      			logger.WithField(common.TagDstPth, common.FmtDstPth(path)),
+		reporter:    			metricsReporter,
+		reconfigurationPollingInterval: client.options.ReconfigurationPollingInterval,
 	}
 	return &tchannelBatchPublisher{
 		basePublisher: base,
@@ -125,7 +126,7 @@ func (p *tchannelBatchPublisher) Open() error {
 	p.endpoints.Store(endpoints)
 	p.reporter.UpdateGauge(metrics.PublishNumConnections, nil, int64(len(hostAddrs)))
 
-	p.reconfigurable = newReconfigurable(p.reconfigureCh, p.closeCh, p.reconfigureHandler, p.logger)
+	p.reconfigurable = newReconfigurable(p.reconfigureCh, p.closeCh, p.reconfigureHandler, p.logger, p.reconfigurationPollingInterval)
 	go p.reconfigurable.reconfigurePump()
 	go p.processor()
 	atomic.StoreInt32(&p.opened, 1)

@@ -155,7 +155,7 @@ func (c *consumerImpl) Open(deliveryCh chan Delivery) (chan Delivery, error) {
 		}
 		c.reporter.UpdateGauge(metrics.ConsumeNumConnections, nil, int64(len(c.connections)))
 
-		c.reconfigurable = newReconfigurable(c.reconfigureCh, c.closingCh, c.reconfigureConsumer, c.logger)
+		c.reconfigurable = newReconfigurable(c.reconfigureCh, c.closingCh, c.reconfigureConsumer, c.logger, c.options.ReconfigurationPollingInterval)
 		go c.reconfigurable.reconfigurePump()
 
 		c.opened = true

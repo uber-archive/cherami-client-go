@@ -164,6 +164,9 @@ type (
 		MetricsReporter metrics.Reporter
 		// Logger is the logger object
 		Logger bark.Logger
+		// Interval for polling input/output host updates. Normally client doesn't need to explicitly set this option
+		// because the default setting should work fine. This is only useful in testing or other edge scenarios
+		ReconfigurationPollingInterval time.Duration
 	}
 
 	// Task represents the task queued in Cherami
