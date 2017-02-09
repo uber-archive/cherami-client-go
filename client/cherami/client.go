@@ -88,11 +88,6 @@ func NewHyperbahnClient(serviceName string, bootstrapFile string, options *Clien
 // NewClientWithFE is used by Frontend to create a Cherami client for itself.
 // It is used by non-streaming publish/consume APIs.
 func NewClientWithFE(feClient cherami.TChanBFrontend, options *ClientOptions) Client {
-	if options == nil {
-		options = getDefaultOptions()
-	}
-	common.ValidateTimeout(options.Timeout)
-
 	verifyOptions(options)
 
 	return &clientImpl{
@@ -103,11 +98,6 @@ func NewClientWithFE(feClient cherami.TChanBFrontend, options *ClientOptions) Cl
 }
 
 func newClientWithTChannel(ch *tchannel.Channel, options *ClientOptions) (Client, error) {
-	if options == nil {
-		options = getDefaultOptions()
-	}
-	common.ValidateTimeout(options.Timeout)
-
 	verifyOptions(options)
 
 	tClient := thrift.NewClient(ch, getFrontEndServiceName(options.DeploymentStr), nil)
@@ -264,9 +254,12 @@ func (c *clientImpl) CreatePublisher(request *CreatePublisherRequest) Publisher 
 }
 
 func (c *clientImpl) CreateConsumer(request *CreateConsumerRequest) Consumer {
-	if request.Options == nil {
-		return nil
+	if request.Options != nil {
+		verifyOptions(request.options)
+	} else {
+		request.Options = c.options
 	}
+
 	return newConsumer(c, request.Path, request.ConsumerGroupName, request.ConsumerName, request.PrefetchCount, request.Options)
 }
 
@@ -350,7 +343,13 @@ func getDefaultOptions() *ClientOptions {
 
 // verifyOptions is used to verify if we have a metrics reporter and
 // a logger. If not, just setup a default logger and a null reporter
+// it also validate the timeout is sane
 func verifyOptions(opts *ClientOptions) {
+	if opts == nil {
+		opts = getDefaultOptions()
+	}
+	common.ValidateTimeout(opts.Timeout)
+
 	if opts.Logger == nil {
 		opts.Logger = getDefaultLogger()
 	}
