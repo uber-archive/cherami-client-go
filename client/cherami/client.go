@@ -54,9 +54,10 @@ type (
 )
 
 const (
-	clientRetryInterval           = 50 * time.Millisecond
-	clientRetryMaxInterval        = 10 * time.Second
-	clientRetryExpirationInterval = 1 * time.Minute
+	clientRetryInterval                   = 50 * time.Millisecond
+	clientRetryMaxInterval                = 10 * time.Second
+	clientRetryExpirationInterval         = 1 * time.Minute
+	defaultReconfigurationPollingInterval = 10 * time.Second
 )
 
 var envUserName = os.Getenv("USER")
@@ -257,7 +258,7 @@ func (c *clientImpl) CreatePublisher(request *CreatePublisherRequest) Publisher 
 	case PublisherTypeStreaming:
 		return NewPublisher(c, request.Path, request.MaxInflightMessagesPerConnection)
 	case PublisherTypeNonStreaming:
-		return newTChannelBatchPublisher(c, c.connection, request.Path, c.options.Logger, c.options.MetricsReporter)
+		return newTChannelBatchPublisher(c, c.connection, request.Path, c.options.Logger, c.options.MetricsReporter, c.options.ReconfigurationPollingInterval)
 	}
 	return nil
 }
@@ -340,9 +341,10 @@ func getDefaultLogger() bark.Logger {
 
 func getDefaultOptions() *ClientOptions {
 	return &ClientOptions{
-		Timeout:         time.Minute,
-		Logger:          getDefaultLogger(),
-		MetricsReporter: metrics.NewNullReporter(),
+		Timeout:         		time.Minute,
+		Logger:          		getDefaultLogger(),
+		MetricsReporter: 		metrics.NewNullReporter(),
+		ReconfigurationPollingInterval: defaultReconfigurationPollingInterval,
 	}
 }
 
@@ -355,6 +357,10 @@ func verifyOptions(opts *ClientOptions) {
 
 	if opts.MetricsReporter == nil {
 		opts.MetricsReporter = metrics.NewNullReporter()
+	}
+
+	if int64(opts.ReconfigurationPollingInterval/time.Second) == 0 {
+		opts.ReconfigurationPollingInterval = defaultReconfigurationPollingInterval
 	}
 
 	// Now make sure we init the default metrics as well

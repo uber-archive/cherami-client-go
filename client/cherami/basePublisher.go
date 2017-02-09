@@ -41,13 +41,14 @@ type (
 	// common to all types of Publisher
 	// implementations
 	basePublisher struct {
-		idCounter      int64
-		path           string
-		client         Client
-		logger         bark.Logger
-		reporter       metrics.Reporter
-		retryPolicy    backoff.RetryPolicy
-		checksumOption cherami.ChecksumOption
+		idCounter      			 int64
+		path           			 string
+		client         			 Client
+		logger         			 bark.Logger
+		reporter       			 metrics.Reporter
+		retryPolicy    			 backoff.RetryPolicy
+		checksumOption 			 cherami.ChecksumOption
+		reconfigurationPollingInterval   time.Duration
 	}
 
 	// publishError represents a message publishing error

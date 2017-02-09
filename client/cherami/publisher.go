@@ -70,11 +70,12 @@ var _ Publisher = (*publisherImpl)(nil)
 // NewPublisher constructs a new Publisher object
 func NewPublisher(client *clientImpl, path string, maxInflightMessagesPerConnection int) Publisher {
 	base := basePublisher{
-		client:      client,
-		retryPolicy: createDefaultPublisherRetryPolicy(),
-		path:        path,
-		logger:      client.options.Logger.WithField(common.TagDstPth, common.FmtDstPth(path)),
-		reporter:    client.options.MetricsReporter,
+		client:                           client,
+		retryPolicy:                      createDefaultPublisherRetryPolicy(),
+		path:        			  path,
+		logger:      			  client.options.Logger.WithField(common.TagDstPth, common.FmtDstPth(path)),
+		reporter:    			  client.options.MetricsReporter,
+		reconfigurationPollingInterval:   client.options.ReconfigurationPollingInterval,
 	}
 	publisher := &publisherImpl{
 		basePublisher:                    base,
@@ -129,7 +130,7 @@ func (s *publisherImpl) Open() error {
 		}
 		s.reporter.UpdateGauge(metrics.PublishNumConnections, nil, int64(len(s.connections)))
 
-		s.reconfigurable = newReconfigurable(s.reconfigureCh, s.closingCh, s.reconfigurePublisher, s.logger)
+		s.reconfigurable = newReconfigurable(s.reconfigureCh, s.closingCh, s.reconfigurePublisher, s.logger, s.reconfigurationPollingInterval)
 		go s.reconfigurable.reconfigurePump()
 
 		s.opened = true
