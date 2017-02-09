@@ -76,14 +76,14 @@ const (
 
 var _ Publisher = (*tchannelBatchPublisher)(nil)
 
-func newTChannelBatchPublisher(client *clientImpl, tchan *tchannel.Channel, path string, logger bark.Logger, metricsReporter metrics.Reporter) Publisher {
+func newTChannelBatchPublisher(client Client, tchan *tchannel.Channel, path string, logger bark.Logger, metricsReporter metrics.Reporter, reconfigurationPollingInterval time.Duration) Publisher {
 	base := basePublisher{
 		client:      			client,
 		retryPolicy: 			createDefaultPublisherRetryPolicy(),
 		path:				path,
 		logger:      			logger.WithField(common.TagDstPth, common.FmtDstPth(path)),
 		reporter:    			metricsReporter,
-		reconfigurationPollingInterval: client.options.ReconfigurationPollingInterval,
+		reconfigurationPollingInterval: reconfigurationPollingInterval,
 	}
 	return &tchannelBatchPublisher{
 		basePublisher: base,

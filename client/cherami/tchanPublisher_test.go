@@ -24,6 +24,7 @@ import (
 	"math/rand"
 	"sync"
 	"testing"
+	"time"
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/stretchr/testify/mock"
@@ -55,7 +56,7 @@ func (s *TChanBatchPublisherSuite) SetupTest() {
 	s.Assertions = require.New(s.T()) // Have to define our overridden assertions in the test setup. If we did it earlier, s.T() will return nil
 	s.logger = bark.NewLoggerFromLogrus(log.StandardLogger())
 	s.client = new(mockClient)
-	s.publisher = newTChannelBatchPublisher(s.client, nil, "/test/tchanBatchPublisher", s.logger, metrics.NewNullReporter()).(*tchannelBatchPublisher)
+	s.publisher = newTChannelBatchPublisher(s.client, nil, "/test/tchanBatchPublisher", s.logger, metrics.NewNullReporter(), time.Second).(*tchannelBatchPublisher)
 	s.publisher.opened = 1
 }
 
