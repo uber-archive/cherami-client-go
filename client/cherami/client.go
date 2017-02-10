@@ -88,12 +88,7 @@ func NewHyperbahnClient(serviceName string, bootstrapFile string, options *Clien
 // NewClientWithFE is used by Frontend to create a Cherami client for itself.
 // It is used by non-streaming publish/consume APIs.
 func NewClientWithFE(feClient cherami.TChanBFrontend, options *ClientOptions) Client {
-	if options == nil {
-		options = getDefaultOptions()
-	}
-	common.ValidateTimeout(options.Timeout)
-
-	verifyOptions(options)
+	options = verifyOptions(options)
 
 	return &clientImpl{
 		client:      feClient,
@@ -103,12 +98,7 @@ func NewClientWithFE(feClient cherami.TChanBFrontend, options *ClientOptions) Cl
 }
 
 func newClientWithTChannel(ch *tchannel.Channel, options *ClientOptions) (Client, error) {
-	if options == nil {
-		options = getDefaultOptions()
-	}
-	common.ValidateTimeout(options.Timeout)
-
-	verifyOptions(options)
+	options = verifyOptions(options)
 
 	tClient := thrift.NewClient(ch, getFrontEndServiceName(options.DeploymentStr), nil)
 
@@ -264,9 +254,12 @@ func (c *clientImpl) CreatePublisher(request *CreatePublisherRequest) Publisher 
 }
 
 func (c *clientImpl) CreateConsumer(request *CreateConsumerRequest) Consumer {
-	if request.Options == nil {
-		return nil
+	if request.Options != nil {
+		request.Options = verifyOptions(request.Options)
+	} else {
+		request.Options = c.options
 	}
+
 	return newConsumer(c, request.Path, request.ConsumerGroupName, request.ConsumerName, request.PrefetchCount, request.Options)
 }
 
@@ -350,7 +343,13 @@ func getDefaultOptions() *ClientOptions {
 
 // verifyOptions is used to verify if we have a metrics reporter and
 // a logger. If not, just setup a default logger and a null reporter
-func verifyOptions(opts *ClientOptions) {
+// it also validate the timeout is sane
+func verifyOptions(opts *ClientOptions) *ClientOptions{
+	if opts == nil {
+		opts = getDefaultOptions()
+	}
+	common.ValidateTimeout(opts.Timeout)
+
 	if opts.Logger == nil {
 		opts.Logger = getDefaultLogger()
 	}
@@ -365,6 +364,7 @@ func verifyOptions(opts *ClientOptions) {
 
 	// Now make sure we init the default metrics as well
 	opts.MetricsReporter.InitMetrics(metrics.MetricDefs)
+	return opts
 }
 
 func createDefaultRetryPolicy() backoff.RetryPolicy {

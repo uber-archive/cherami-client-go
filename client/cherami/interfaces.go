@@ -145,6 +145,7 @@ type (
 		// more messages being buffered locally causing high memory foot print
 		PrefetchCount int
 		// Options used for making API calls to Cherami services
+		// This option is now deprecated. If you need to specify any option, you can specify it when you call NewClient()
 		Options *ClientOptions
 	}
 
