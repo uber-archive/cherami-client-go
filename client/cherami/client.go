@@ -88,7 +88,7 @@ func NewHyperbahnClient(serviceName string, bootstrapFile string, options *Clien
 // NewClientWithFE is used by Frontend to create a Cherami client for itself.
 // It is used by non-streaming publish/consume APIs.
 func NewClientWithFE(feClient cherami.TChanBFrontend, options *ClientOptions) Client {
-	verifyOptions(options)
+	options = verifyOptions(options)
 
 	return &clientImpl{
 		client:      feClient,
@@ -98,7 +98,7 @@ func NewClientWithFE(feClient cherami.TChanBFrontend, options *ClientOptions) Cl
 }
 
 func newClientWithTChannel(ch *tchannel.Channel, options *ClientOptions) (Client, error) {
-	verifyOptions(options)
+	options = verifyOptions(options)
 
 	tClient := thrift.NewClient(ch, getFrontEndServiceName(options.DeploymentStr), nil)
 
@@ -255,7 +255,7 @@ func (c *clientImpl) CreatePublisher(request *CreatePublisherRequest) Publisher 
 
 func (c *clientImpl) CreateConsumer(request *CreateConsumerRequest) Consumer {
 	if request.Options != nil {
-		verifyOptions(request.options)
+		request.Options = verifyOptions(request.Options)
 	} else {
 		request.Options = c.options
 	}
@@ -344,7 +344,7 @@ func getDefaultOptions() *ClientOptions {
 // verifyOptions is used to verify if we have a metrics reporter and
 // a logger. If not, just setup a default logger and a null reporter
 // it also validate the timeout is sane
-func verifyOptions(opts *ClientOptions) {
+func verifyOptions(opts *ClientOptions) *ClientOptions{
 	if opts == nil {
 		opts = getDefaultOptions()
 	}
@@ -364,6 +364,7 @@ func verifyOptions(opts *ClientOptions) {
 
 	// Now make sure we init the default metrics as well
 	opts.MetricsReporter.InitMetrics(metrics.MetricDefs)
+	return opts
 }
 
 func createDefaultRetryPolicy() backoff.RetryPolicy {
