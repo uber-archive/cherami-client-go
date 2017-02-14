@@ -372,6 +372,15 @@ func (conn *outputHostConnection) Nack(ids []string) error {
 	return conn.ackClient.AckMessages(ctx, ackRequest)
 }
 
+func (conn *outputHostConnection) ReportProcessingTime(t time.Duration, ack bool) {
+	conn.reporter.RecordTimer(metrics.ProcessLatency, nil, t)
+	if ack {
+		conn.reporter.RecordTimer(metrics.ProcessAckLatency, nil, t)
+	} else {
+		conn.reporter.RecordTimer(metrics.ProcessNackLatency, nil, t)
+	}
+}
+
 func (conn *outputHostConnection) closeAcksBatchCh() {
 	conn.acksBatchLk.Lock()
 	defer conn.acksBatchLk.Unlock()
