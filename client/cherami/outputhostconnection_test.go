@@ -42,6 +42,10 @@ import (
 	"github.com/uber-common/bark"
 )
 
+const (
+	testPrefetchSize = int32(100)
+)
+
 type OutputHostConnectionSuite struct {
 	*require.Assertions // override suite.Suite.Assertions with require.Assertions; this means that s.NotNil(nil) will stop the test, not merely log an error
 	suite.Suite
@@ -211,6 +215,7 @@ func (s *OutputHostConnectionSuite) TestRenewCreditsFailed() {
 	conn.open()
 	s.True(conn.isOpened(), "Connection not opened.")
 
+	halfBatch := int(conn.creditBatchSize) / 2
 	for i := 0; i < int(conn.creditBatchSize); i++ {
 		delivery := <-messagesCh
 		s.NotNil(delivery, "Delivery cannot be nil.")
@@ -218,8 +223,18 @@ func (s *OutputHostConnectionSuite) TestRenewCreditsFailed() {
 		msg := delivery.GetMessage()
 		s.NotNil(msg, "Message cannot be nil.")
 		s.Equal("test", msg.GetAckId())
+
+		if i == halfBatch { // Halfway through, wait to see the local credits stabilize to the right value
+			for {
+				localCredits := atomic.LoadInt64(&localCreditsLastVal)
+				if localCredits == int64(halfBatch+1) { // +1 because we started counting i from 0
+					break
+				}
+				time.Sleep(time.Second)
+			}
+		}
 	}
-	s.EqualValues(10, atomic.LoadInt64(&localCreditsLastVal))
+	s.True(atomic.LoadInt64(&localCreditsLastVal) < int64(conn.creditBatchSize))
 
 	time.Sleep(10 * time.Millisecond)
 	s.True(conn.isClosed(), "Connection not closed.")
@@ -228,7 +243,7 @@ func (s *OutputHostConnectionSuite) TestRenewCreditsFailed() {
 
 	s.InDelta(int64(time.Second+time.Microsecond), atomic.LoadInt64(&latency), float64(time.Second))
 	s.True(atomic.LoadInt64(&rate) > 2, fmt.Sprintf("rate was %v", atomic.LoadInt64(&rate)))
-	s.True(atomic.LoadInt64(&rate) < 10, fmt.Sprintf("rate was %v", atomic.LoadInt64(&rate)))
+	s.True(atomic.LoadInt64(&rate) <= int64(conn.creditBatchSize)+int64(testPrefetchSize), fmt.Sprintf("rate was %v", atomic.LoadInt64(&rate)))
 }
 
 func createOutputHostConnection() (*outputHostConnection, *mc.MockTChanBOutClient, *mc.MockBOutOpenConsumerStreamOutCall, chan Delivery) {
@@ -251,7 +266,7 @@ func createOutputHostConnection() (*outputHostConnection, *mc.MockTChanBOutClien
 		reconfigureCh,
 		host,
 		cherami.Protocol_WS,
-		int32(100),
+		testPrefetchSize,
 		bark.NewLoggerFromLogrus(log.StandardLogger()),
 		metrics.NewTestReporter(nil))
 

@@ -192,7 +192,6 @@ func (conn *outputHostConnection) readMessagesPump() {
 
 	var localCredits int32
 	for {
-		conn.reporter.UpdateGauge(metrics.ConsumeLocalCredits, nil, int64(localCredits))
 		if localCredits >= conn.creditBatchSize {
 			// Issue more credits
 			select {
@@ -202,6 +201,7 @@ func (conn *outputHostConnection) readMessagesPump() {
 				conn.logger.Debugf("Credits channel is full. Unable to write to creditsCh.")
 			}
 		}
+		conn.reporter.UpdateGauge(metrics.ConsumeLocalCredits, nil, int64(localCredits))
 
 		cmd, err := conn.outputHostStream.Read()
 		if err != nil {
@@ -329,7 +329,6 @@ func (conn *outputHostConnection) sendCredits(credits int32) error {
 	flows := cherami.NewControlFlow()
 	flows.Credits = common.Int32Ptr(credits)
 
-	conn.reporter.IncCounter(metrics.ConsumeCreditRate, nil, 1)
 	sw := conn.reporter.StartTimer(metrics.ConsumeCreditLatency, nil)
 	defer sw.Stop()
 
@@ -337,7 +336,7 @@ func (conn *outputHostConnection) sendCredits(credits int32) error {
 	if err == nil {
 		err = conn.outputHostStream.Flush()
 	} else {
-		conn.reporter.IncCounter(metrics.ConsumeCreditRate, nil, 1)
+		conn.reporter.IncCounter(metrics.ConsumeCreditRate, nil, int64(credits))
 	}
 
 	return err
