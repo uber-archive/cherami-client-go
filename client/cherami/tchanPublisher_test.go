@@ -126,7 +126,7 @@ func (s *TChanBatchPublisherSuite) TestPublishBatchSuccess() {
 	}
 }
 
-func (s *TChanBatchPublisherSuite) j() {
+func (s *TChanBatchPublisherSuite) TestPublishBatchFailure() {
 	for _, sz := range []int{1, 16, 16, 5} {
 		ackIDs := make([]string, common.MinInt(16, sz))
 		for i := range ackIDs {
