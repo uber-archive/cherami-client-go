@@ -23,6 +23,7 @@ package cherami
 import (
 	"math/rand"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -56,7 +57,7 @@ func (s *TChanBatchPublisherSuite) SetupTest() {
 	s.Assertions = require.New(s.T()) // Have to define our overridden assertions in the test setup. If we did it earlier, s.T() will return nil
 	s.logger = bark.NewLoggerFromLogrus(log.StandardLogger())
 	s.client = new(mockClient)
-	s.publisher = newTChannelBatchPublisher(s.client, nil, "/test/tchanBatchPublisher", s.logger, metrics.NewNullReporter(), time.Second).(*tchannelBatchPublisher)
+	s.publisher = newTChannelBatchPublisher(s.client, nil, "/test/tchanBatchPublisher", s.logger, metrics.NewTestReporter(nil), time.Second).(*tchannelBatchPublisher)
 	s.publisher.opened = 1
 }
 
@@ -66,7 +67,14 @@ func (s *TChanBatchPublisherSuite) TestBatchSzWithinRange() {
 }
 
 func (s *TChanBatchPublisherSuite) TestPublishBatchSuccess() {
+	defer metrics.RegisterHandler(metrics.PublishMessageRate, ``, ``, nil)
+	defer metrics.RegisterHandler(metrics.PublishMessageLatency, ``, ``, nil)
+
 	for _, sz := range []int{1, 16, 16, 5} {
+		var rate, rateCount, latency, latencyCount int64
+		metrics.RegisterHandler(metrics.PublishMessageRate, ``, ``, metrics.SummingHandler(&rate, &rateCount))
+		metrics.RegisterHandler(metrics.PublishMessageLatency, ``, ``, metrics.SummingHandler(&latency, &latencyCount))
+
 		ackIDs := make([]string, common.MinInt(16, sz))
 		for i := range ackIDs {
 			ackIDs[i] = s.publisher.msgIDToHexStr(i)
@@ -108,10 +116,17 @@ func (s *TChanBatchPublisherSuite) TestPublishBatchSuccess() {
 
 		close(s.publisher.closeCh)
 		wg.Wait()
+
+		s.EqualValues(atomic.LoadInt64(&rate), 1)
+		s.EqualValues(atomic.LoadInt64(&rateCount), 1)
+		s.InDelta(int64(time.Second+time.Microsecond), atomic.LoadInt64(&latency), float64(time.Second)) // Latency is > than 1 microsecond, < 2 seconds
+		s.EqualValues(atomic.LoadInt64(&latencyCount), 1)
+		metrics.RegisterHandler(metrics.PublishMessageRate, ``, ``, nil)
+		metrics.RegisterHandler(metrics.PublishMessageLatency, ``, ``, nil)
 	}
 }
 
-func (s *TChanBatchPublisherSuite) TestPublishBatchFailure() {
+func (s *TChanBatchPublisherSuite) j() {
 	for _, sz := range []int{1, 16, 16, 5} {
 		ackIDs := make([]string, common.MinInt(16, sz))
 		for i := range ackIDs {

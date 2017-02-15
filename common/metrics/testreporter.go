@@ -23,6 +23,7 @@ package metrics
 import (
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -190,4 +191,29 @@ func mapCopy(s map[string]string) (d map[string]string) {
 		d[a] = b
 	}
 	return
+}
+
+// SummingHandler returns a HandlerFn that atomically stores the sum and count of successive calls into the provided
+// atomic variables
+// NOTE: there are two race-free way to reset the counts together:
+// 1) unregister the handler, then zero the counts, and re-register; may lose events
+// 2) register a new handler with a second set of counting variables
+func SummingHandler(atomicSum, atomicCount *int64) HandlerFn {
+	return func(metricName string, baseTags, tags map[string]string, value int64) {
+		atomic.AddInt64(atomicSum, value)
+		if atomicCount != nil {
+			atomic.AddInt64(atomicCount, 1)
+		}
+	}
+}
+
+// KeepLastValueHandler returns a HandlerFn that atomically stores the last value and count of successive calls into
+// the provided atomic variables
+func KeepLastValueHandler(atomicLastValue, atomicCount *int64) HandlerFn {
+	return func(metricName string, baseTags, tags map[string]string, value int64) {
+		atomic.StoreInt64(atomicLastValue, value)
+		if atomicCount != nil {
+			atomic.AddInt64(atomicCount, 1)
+		}
+	}
 }

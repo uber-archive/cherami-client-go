@@ -21,6 +21,8 @@
 package cherami
 
 import (
+	"fmt"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -182,6 +184,14 @@ func (s *OutputHostConnectionSuite) TestInitialCreditsFlushFailed() {
 }
 
 func (s *OutputHostConnectionSuite) TestRenewCreditsFailed() {
+	var rate, latency, localCreditsLastVal int64
+	defer metrics.RegisterHandler(metrics.ConsumeCreditRate, ``, ``, nil)
+	defer metrics.RegisterHandler(metrics.ConsumeCreditLatency, ``, ``, nil)
+	defer metrics.RegisterHandler(metrics.ConsumeLocalCredits, ``, ``, nil)
+	metrics.RegisterHandler(metrics.ConsumeCreditRate, ``, ``, metrics.SummingHandler(&rate, nil))
+	metrics.RegisterHandler(metrics.ConsumeCreditLatency, ``, ``, metrics.SummingHandler(&latency, nil))
+	metrics.RegisterHandler(metrics.ConsumeLocalCredits, ``, ``, metrics.KeepLastValueHandler(&localCreditsLastVal, nil))
+
 	conn, _, stream, messagesCh := createOutputHostConnection()
 
 	initialFlows := cherami.NewControlFlow()
@@ -209,11 +219,16 @@ func (s *OutputHostConnectionSuite) TestRenewCreditsFailed() {
 		s.NotNil(msg, "Message cannot be nil.")
 		s.Equal("test", msg.GetAckId())
 	}
+	s.EqualValues(10, atomic.LoadInt64(&localCreditsLastVal))
 
 	time.Sleep(10 * time.Millisecond)
 	s.True(conn.isClosed(), "Connection not closed.")
 
 	stream.AssertExpectations(s.T())
+
+	s.InDelta(int64(time.Second+time.Microsecond), atomic.LoadInt64(&latency), float64(time.Second))
+	s.True(atomic.LoadInt64(&rate) > 2, fmt.Sprintf("rate was %v", atomic.LoadInt64(&rate)))
+	s.True(atomic.LoadInt64(&rate) < 10, fmt.Sprintf("rate was %v", atomic.LoadInt64(&rate)))
 }
 
 func createOutputHostConnection() (*outputHostConnection, *mc.MockTChanBOutClient, *mc.MockBOutOpenConsumerStreamOutCall, chan Delivery) {
@@ -226,8 +241,19 @@ func createOutputHostConnection() (*outputHostConnection, *mc.MockTChanBOutClien
 	options := &ClientOptions{Timeout: time.Minute}
 
 	wsConnector.On("OpenConsumerStream", mock.Anything, mock.Anything).Return(stream, nil)
-	conn := newOutputHostConnection(ackClient, wsConnector, "/test/outputhostconnection", "/consumer", options,
-		deliveryCh, reconfigureCh, host, cherami.Protocol_WS, int32(100), bark.NewLoggerFromLogrus(log.StandardLogger()), metrics.NewNullReporter())
+	conn := newOutputHostConnection(
+		ackClient,
+		wsConnector,
+		"/test/outputhostconnection",
+		"/consumer",
+		options,
+		deliveryCh,
+		reconfigureCh,
+		host,
+		cherami.Protocol_WS,
+		int32(100),
+		bark.NewLoggerFromLogrus(log.StandardLogger()),
+		metrics.NewTestReporter(nil))
 
 	return conn, ackClient, stream, deliveryCh
 }
