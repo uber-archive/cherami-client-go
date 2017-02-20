@@ -21,6 +21,8 @@
 package cherami
 
 import (
+	"fmt"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -38,6 +40,10 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/uber-common/bark"
+)
+
+const (
+	testPrefetchSize = int32(100)
 )
 
 type OutputHostConnectionSuite struct {
@@ -182,6 +188,14 @@ func (s *OutputHostConnectionSuite) TestInitialCreditsFlushFailed() {
 }
 
 func (s *OutputHostConnectionSuite) TestRenewCreditsFailed() {
+	var rate, latency, localCreditsLastVal int64
+	defer metrics.RegisterHandler(metrics.ConsumeCreditRate, ``, ``, nil)
+	defer metrics.RegisterHandler(metrics.ConsumeCreditLatency, ``, ``, nil)
+	defer metrics.RegisterHandler(metrics.ConsumeLocalCredits, ``, ``, nil)
+	metrics.RegisterHandler(metrics.ConsumeCreditRate, ``, ``, metrics.SummingHandler(&rate, nil))
+	metrics.RegisterHandler(metrics.ConsumeCreditLatency, ``, ``, metrics.SummingHandler(&latency, nil))
+	metrics.RegisterHandler(metrics.ConsumeLocalCredits, ``, ``, metrics.KeepLastValueHandler(&localCreditsLastVal, nil))
+
 	conn, _, stream, messagesCh := createOutputHostConnection()
 
 	initialFlows := cherami.NewControlFlow()
@@ -201,6 +215,7 @@ func (s *OutputHostConnectionSuite) TestRenewCreditsFailed() {
 	conn.open()
 	s.True(conn.isOpened(), "Connection not opened.")
 
+	halfBatch := int(conn.creditBatchSize) / 2
 	for i := 0; i < int(conn.creditBatchSize); i++ {
 		delivery := <-messagesCh
 		s.NotNil(delivery, "Delivery cannot be nil.")
@@ -208,12 +223,27 @@ func (s *OutputHostConnectionSuite) TestRenewCreditsFailed() {
 		msg := delivery.GetMessage()
 		s.NotNil(msg, "Message cannot be nil.")
 		s.Equal("test", msg.GetAckId())
+
+		if i == halfBatch { // Halfway through, wait to see the local credits stabilize to the right value
+			for {
+				localCredits := atomic.LoadInt64(&localCreditsLastVal)
+				if localCredits == int64(halfBatch+1) { // +1 because we started counting i from 0
+					break
+				}
+				time.Sleep(time.Second)
+			}
+		}
 	}
+	s.True(atomic.LoadInt64(&localCreditsLastVal) < int64(conn.creditBatchSize))
 
 	time.Sleep(10 * time.Millisecond)
 	s.True(conn.isClosed(), "Connection not closed.")
 
 	stream.AssertExpectations(s.T())
+
+	s.InDelta(int64(time.Second+time.Microsecond), atomic.LoadInt64(&latency), float64(time.Second))
+	s.True(atomic.LoadInt64(&rate) > 2, fmt.Sprintf("rate was %v", atomic.LoadInt64(&rate)))
+	s.True(atomic.LoadInt64(&rate) <= int64(conn.creditBatchSize)+int64(testPrefetchSize), fmt.Sprintf("rate was %v", atomic.LoadInt64(&rate)))
 }
 
 func createOutputHostConnection() (*outputHostConnection, *mc.MockTChanBOutClient, *mc.MockBOutOpenConsumerStreamOutCall, chan Delivery) {
@@ -226,8 +256,19 @@ func createOutputHostConnection() (*outputHostConnection, *mc.MockTChanBOutClien
 	options := &ClientOptions{Timeout: time.Minute}
 
 	wsConnector.On("OpenConsumerStream", mock.Anything, mock.Anything).Return(stream, nil)
-	conn := newOutputHostConnection(ackClient, wsConnector, "/test/outputhostconnection", "/consumer", options,
-		deliveryCh, reconfigureCh, host, cherami.Protocol_WS, int32(100), bark.NewLoggerFromLogrus(log.StandardLogger()), metrics.NewNullReporter())
+	conn := newOutputHostConnection(
+		ackClient,
+		wsConnector,
+		"/test/outputhostconnection",
+		"/consumer",
+		options,
+		deliveryCh,
+		reconfigureCh,
+		host,
+		cherami.Protocol_WS,
+		testPrefetchSize,
+		bark.NewLoggerFromLogrus(log.StandardLogger()),
+		metrics.NewTestReporter(nil))
 
 	return conn, ackClient, stream, deliveryCh
 }

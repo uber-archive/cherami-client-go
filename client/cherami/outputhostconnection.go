@@ -192,7 +192,6 @@ func (conn *outputHostConnection) readMessagesPump() {
 
 	var localCredits int32
 	for {
-		conn.reporter.UpdateGauge(metrics.ConsumeLocalCredits, nil, int64(localCredits))
 		if localCredits >= conn.creditBatchSize {
 			// Issue more credits
 			select {
@@ -202,6 +201,7 @@ func (conn *outputHostConnection) readMessagesPump() {
 				conn.logger.Debugf("Credits channel is full. Unable to write to creditsCh.")
 			}
 		}
+		conn.reporter.UpdateGauge(metrics.ConsumeLocalCredits, nil, int64(localCredits))
 
 		cmd, err := conn.outputHostStream.Read()
 		if err != nil {
@@ -329,7 +329,6 @@ func (conn *outputHostConnection) sendCredits(credits int32) error {
 	flows := cherami.NewControlFlow()
 	flows.Credits = common.Int32Ptr(credits)
 
-	conn.reporter.IncCounter(metrics.ConsumeCreditRate, nil, 1)
 	sw := conn.reporter.StartTimer(metrics.ConsumeCreditLatency, nil)
 	defer sw.Stop()
 
@@ -337,7 +336,7 @@ func (conn *outputHostConnection) sendCredits(credits int32) error {
 	if err == nil {
 		err = conn.outputHostStream.Flush()
 	} else {
-		conn.reporter.IncCounter(metrics.ConsumeCreditRate, nil, 1)
+		conn.reporter.IncCounter(metrics.ConsumeCreditRate, nil, int64(credits))
 	}
 
 	return err
@@ -370,6 +369,15 @@ func (conn *outputHostConnection) Nack(ids []string) error {
 
 	conn.reporter.IncCounter(metrics.ConsumeNackRate, nil, int64(len(ids)))
 	return conn.ackClient.AckMessages(ctx, ackRequest)
+}
+
+func (conn *outputHostConnection) ReportProcessingTime(t time.Duration, ack bool) {
+	conn.reporter.RecordTimer(metrics.ProcessLatency, nil, t)
+	if ack {
+		conn.reporter.RecordTimer(metrics.ProcessAckLatency, nil, t)
+	} else {
+		conn.reporter.RecordTimer(metrics.ProcessNackLatency, nil, t)
+	}
 }
 
 func (conn *outputHostConnection) closeAcksBatchCh() {

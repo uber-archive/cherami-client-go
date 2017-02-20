@@ -25,14 +25,16 @@ import (
 	"crypto/md5"
 	"hash/crc32"
 	"strings"
+	"time"
 
 	"github.com/uber/cherami-thrift/.generated/go/cherami"
 )
 
 type (
 	deliveryImpl struct {
-		message      *cherami.ConsumerMessage
-		acknowledger acknowledger
+		message              *cherami.ConsumerMessage
+		acknowledger         acknowledger
+		messageDeliveredTime time.Time
 	}
 
 	// acknowledger can be used to Ack/Nack messages from a specific OutputHost
@@ -40,6 +42,7 @@ type (
 		GetAcknowledgerID() string
 		Ack(ids []string) error
 		Nack(ids []string) error
+		ReportProcessingTime(t time.Duration, ack bool)
 	}
 )
 
@@ -55,6 +58,9 @@ func newDelivery(msg *cherami.ConsumerMessage, acknowledger acknowledger) Delive
 }
 
 func (d *deliveryImpl) GetMessage() *cherami.ConsumerMessage {
+	if d.messageDeliveredTime.IsZero() { // Some consumers may call GetMessage() several times. Start our timer at the first call
+		d.messageDeliveredTime = time.Now()
+	}
 	return d.message
 }
 
@@ -65,10 +71,16 @@ func (d *deliveryImpl) GetDeliveryToken() string {
 }
 
 func (d *deliveryImpl) Ack() error {
+	if !d.messageDeliveredTime.IsZero() { // Bad consumers may Ack() before even reading the message
+		d.acknowledger.ReportProcessingTime(time.Since(d.messageDeliveredTime), true)
+	}
 	return d.acknowledger.Ack([]string{d.message.GetAckId()})
 }
 
 func (d *deliveryImpl) Nack() error {
+	if !d.messageDeliveredTime.IsZero() { // Bad consumers may Nack() before even reading the message
+		d.acknowledger.ReportProcessingTime(time.Since(d.messageDeliveredTime), false)
+	}
 	return d.acknowledger.Nack([]string{d.message.GetAckId()})
 }
 

@@ -74,6 +74,12 @@ const (
 	ConsumeNumConnections = "cherami.consume.connections"
 	// ConsumeLocalCredits is the number of credit hold locally by consumer
 	ConsumeLocalCredits = "cherami.consume.credit.local"
+	// ProcessLatency is the time between the message being read by the consumer, and either acked or nacked
+	ProcessLatency = "cherami.consume.process.latency"
+	// ProcessAckLatency is the time between the message being read by the consumer and being acked
+	ProcessAckLatency = "cherami.consume.ack.latency"
+	// ProcessNackLatency is the time between the message being read by the consumer and being nacked
+	ProcessNackLatency = "cherami.consume.nack.latency"
 )
 
 // MetricDefs contains definition of metrics to its type mapping
@@ -96,4 +102,7 @@ var MetricDefs = map[MetricName]MetricType{
 	ConsumeReconfigureRate:  Counter,
 	ConsumeNumConnections:   Gauge,
 	ConsumeLocalCredits:     Gauge,
+	ProcessLatency:          Timer,
+	ProcessAckLatency:       Timer,
+	ProcessNackLatency:      Timer,
 }

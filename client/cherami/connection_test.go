@@ -29,10 +29,10 @@ import (
 	_ "fmt"
 	_ "strconv"
 
-	"github.com/uber/cherami-thrift/.generated/go/cherami"
 	"github.com/uber/cherami-client-go/common"
 	"github.com/uber/cherami-client-go/common/metrics"
 	mc "github.com/uber/cherami-client-go/mocks/clients/cherami"
+	"github.com/uber/cherami-thrift/.generated/go/cherami"
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/stretchr/testify/mock"
@@ -337,7 +337,19 @@ func createConnection() (*connection, *mc.MockBInOpenPublisherStreamOutCall, cha
 	inputHostClient.On("OpenPublisherStream", mock.Anything).Return(stream, nil)
 	wsConnector.On("OpenPublisherStream", mock.Anything, mock.Anything).Return(stream, nil)
 
-	return newConnection(inputHostClient, wsConnector, "/test/inputhostconnection", messagesCh, reconfigureCh, host, cherami.Protocol_WS, 0, bark.NewLoggerFromLogrus(log.StandardLogger()), metrics.NewNullReporter()), stream, messagesCh
+	return newConnection(
+			inputHostClient,
+			wsConnector,
+			"/test/inputhostconnection",
+			messagesCh,
+			reconfigureCh,
+			host,
+			cherami.Protocol_WS,
+			0,
+			bark.NewLoggerFromLogrus(log.StandardLogger()),
+			metrics.NewTestReporter(nil)),
+		stream,
+		messagesCh
 }
 
 func wrapAckInCommand(ack *cherami.PutMessageAck) *cherami.InputHostCommand {
