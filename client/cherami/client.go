@@ -85,10 +85,29 @@ func NewHyperbahnClient(serviceName string, bootstrapFile string, options *Clien
 	return newClientWithTChannel(ch, options)
 }
 
-// NewClientWithFE is used by Frontend to create a Cherami client for itself.
-// It is used by non-streaming publish/consume APIs.
+// NewClientWithFEClient is used by Cherami Frontend to create a Cherami client for itself.
+// Cherami customers shouldn't need to use this function.
+func NewClientWithFEClient(feClient cherami.TChanBFrontend, options *ClientOptions) (Client, error) {
+	options, err := verifyOptions(options)
+	if err != nil {
+		return nil, err
+	}
+
+	return &clientImpl{
+		client:      feClient,
+		options:     options,
+		retryPolicy: createDefaultRetryPolicy(),
+	}, nil
+}
+
+// NewClientWithFEClient is used by Cherami Frontend to create a Cherami client for itself.
+// Cherami customers shouldn't need to use this function.
+// This function is deprecated, use NewClientWithFEClient instead
 func NewClientWithFE(feClient cherami.TChanBFrontend, options *ClientOptions) Client {
-	options = verifyOptions(options)
+	options, err := verifyOptions(options)
+	if err != nil {
+		panic(fmt.Sprintf(`Client option is invalid (and NewClientWithFEn is deprecated, use NewClientWithFEClient instead). Error: %v`, err))
+	}
 
 	return &clientImpl{
 		client:      feClient,
@@ -98,7 +117,10 @@ func NewClientWithFE(feClient cherami.TChanBFrontend, options *ClientOptions) Cl
 }
 
 func newClientWithTChannel(ch *tchannel.Channel, options *ClientOptions) (Client, error) {
-	options = verifyOptions(options)
+	options, err := verifyOptions(options)
+	if err != nil {
+		return nil, err
+	}
 
 	tClient := thrift.NewClient(ch, getFrontEndServiceName(options.DeploymentStr), nil)
 
@@ -255,7 +277,10 @@ func (c *clientImpl) CreatePublisher(request *CreatePublisherRequest) Publisher 
 
 func (c *clientImpl) CreateConsumer(request *CreateConsumerRequest) Consumer {
 	if request.Options != nil {
-		request.Options = verifyOptions(request.Options)
+		var err error
+		if request.Options, err = verifyOptions(request.Options); err != nil {
+			panic(fmt.Sprintf(`Client option is invalid (and CreateConsumerRequest.Options is deprecated). Error: %v`, err))
+		}
 	} else {
 		request.Options = c.options
 	}
@@ -344,11 +369,16 @@ func getDefaultOptions() *ClientOptions {
 // verifyOptions is used to verify if we have a metrics reporter and
 // a logger. If not, just setup a default logger and a null reporter
 // it also validate the timeout is sane
-func verifyOptions(opts *ClientOptions) *ClientOptions{
+func verifyOptions(opts *ClientOptions) (*ClientOptions, error){
 	if opts == nil {
 		opts = getDefaultOptions()
 	}
-	common.ValidateTimeout(opts.Timeout)
+	if opts.Timeout.Nanoseconds() == 0 {
+		opts.Timeout = getDefaultOptions().Timeout
+	}
+	if err := common.ValidateTimeout(opts.Timeout); err != nil {
+		return nil, err
+	}
 
 	if opts.Logger == nil {
 		opts.Logger = getDefaultLogger()
@@ -357,14 +387,14 @@ func verifyOptions(opts *ClientOptions) *ClientOptions{
 	if opts.MetricsReporter == nil {
 		opts.MetricsReporter = metrics.NewNullReporter()
 	}
+	// Now make sure we init the default metrics as well
+	opts.MetricsReporter.InitMetrics(metrics.MetricDefs)
 
 	if int64(opts.ReconfigurationPollingInterval/time.Second) == 0 {
 		opts.ReconfigurationPollingInterval = defaultReconfigurationPollingInterval
 	}
 
-	// Now make sure we init the default metrics as well
-	opts.MetricsReporter.InitMetrics(metrics.MetricDefs)
-	return opts
+	return opts, nil
 }
 
 func createDefaultRetryPolicy() backoff.RetryPolicy {
