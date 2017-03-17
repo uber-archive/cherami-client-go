@@ -74,7 +74,8 @@ func NewClient(serviceName string, host string, port int, options *ClientOptions
 	return newClientWithTChannel(ch, options)
 }
 
-// NewHyperbahnClient returns the singleton Cherami client used for communicating with the service via hyperbahn. Streaming methods will probably not work.
+// NewHyperbahnClient returns the singleton Cherami client used for communicating with the service via Hyperbahn or
+// Muttley. Streaming methods (for LOG/Consistent destinations) will not work.
 func NewHyperbahnClient(serviceName string, bootstrapFile string, options *ClientOptions) (Client, error) {
 	ch, err := tchannel.NewChannel(serviceName, nil)
 	if err != nil {
@@ -87,6 +88,7 @@ func NewHyperbahnClient(serviceName string, bootstrapFile string, options *Clien
 
 // NewClientWithFE is used by Frontend to create a Cherami client for itself.
 // It is used by non-streaming publish/consume APIs.
+// ** Internal Cherami Use Only **
 func NewClientWithFE(feClient cherami.TChanBFrontend, options *ClientOptions) Client {
 	options = verifyOptions(options)
 
