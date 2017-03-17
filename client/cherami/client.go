@@ -100,22 +100,6 @@ func NewClientWithFEClient(feClient cherami.TChanBFrontend, options *ClientOptio
 	}, nil
 }
 
-// NewClientWithFEClient is used by Cherami Frontend to create a Cherami client for itself.
-// Cherami customers shouldn't need to use this function.
-// This function is deprecated, use NewClientWithFEClient instead
-func NewClientWithFE(feClient cherami.TChanBFrontend, options *ClientOptions) Client {
-	options, err := verifyOptions(options)
-	if err != nil {
-		panic(fmt.Sprintf(`Client option is invalid (and NewClientWithFEn is deprecated, use NewClientWithFEClient instead). Error: %v`, err))
-	}
-
-	return &clientImpl{
-		client:      feClient,
-		options:     options,
-		retryPolicy: createDefaultRetryPolicy(),
-	}
-}
-
 func newClientWithTChannel(ch *tchannel.Channel, options *ClientOptions) (Client, error) {
 	options, err := verifyOptions(options)
 	if err != nil {
@@ -277,6 +261,8 @@ func (c *clientImpl) CreatePublisher(request *CreatePublisherRequest) Publisher 
 
 func (c *clientImpl) CreateConsumer(request *CreateConsumerRequest) Consumer {
 	if request.Options != nil {
+		c.options.Logger.Warn(`CreateConsumerRequest.Options is deprecated. Client options should be set when creating the client`)
+
 		var err error
 		if request.Options, err = verifyOptions(request.Options); err != nil {
 			panic(fmt.Sprintf(`Client option is invalid (and CreateConsumerRequest.Options is deprecated). Error: %v`, err))

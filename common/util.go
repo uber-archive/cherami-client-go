@@ -283,7 +283,7 @@ func ValidateTimeout(t time.Duration) error {
 		return nil
 	}
 
-	return errors.New(fmt.Sprintf(`Configured timeout is out of range: %v`, t))
+	return errors.New(fmt.Sprintf(`Configured timeout [%v] must be in range [100ms-5min]`, t))
 }
 
 // MinInt returns the minimum of values (a, b)
