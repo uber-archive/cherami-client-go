@@ -24,6 +24,7 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"math/rand"
@@ -276,13 +277,13 @@ func (avg *GeometricRollingAverage) GetGeometricRollingAverage() float64 {
 	return float64(*avg)
 }
 
-// ValidateTimeout panics if the passed timeout is unreasonable
-func ValidateTimeout(t time.Duration) {
+// ValidateTimeout returns an error if the passed timeout is unreasonable
+func ValidateTimeout(t time.Duration) error {
 	if t >= time.Millisecond*100 && t <= time.Minute*5 {
-		return
+		return nil
 	}
 
-	panic(fmt.Sprintf(`Configured timeout is out of range: %v`, t))
+	return errors.New(fmt.Sprintf(`Configured timeout [%v] must be in range [100ms-5min]`, t))
 }
 
 // MinInt returns the minimum of values (a, b)
