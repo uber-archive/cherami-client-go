@@ -223,7 +223,7 @@ func (s *ConnectionSuite) TestClientDrain() {
 	requestDone := make(chan *PublisherReceipt, 1)
 
 	messagesCh <- putMessageRequest{message, requestDone}
-	<-time.After(6 * time.Millisecond)
+	<-time.After(10 * time.Millisecond)
 	// drain must be set
 	s.Equal(int32(1), atomic.LoadInt32(&conn.drained))
 	// closed must return true as well
