@@ -49,6 +49,8 @@ const (
 	PublishAckRate = "cherami.publish.ack.rate"
 	// PublishReconfigureRate is the rate of reconfiguration happening
 	PublishReconfigureRate = "cherami.publish.reconfigure.rate"
+	// PublishDrainRate is the rate of drain happening
+	PublishDrainRate = "cherami.publish.drain.rate"
 	// PublishNumConnections is the number of connections with input
 	PublishNumConnections = "cherami.publish.connections"
 	// PublishNumInflightMessagess is the number of inflight messages hold locally by publisher

@@ -1,6 +1,7 @@
 package: github.com/uber/cherami-client-go
 import:
 - package: github.com/uber/cherami-thrift
+  version: graceful_drain
   subpackages:
   - .generated/go/cherami
 - package: github.com/Sirupsen/logrus
