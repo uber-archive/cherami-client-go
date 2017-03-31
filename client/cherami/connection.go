@@ -31,10 +31,10 @@ import (
 
 	"time"
 
-	"github.com/uber/cherami-thrift/.generated/go/cherami"
 	"github.com/uber/cherami-client-go/common"
 	"github.com/uber/cherami-client-go/common/metrics"
 	"github.com/uber/cherami-client-go/stream"
+	"github.com/uber/cherami-thrift/.generated/go/cherami"
 )
 
 type (
@@ -56,9 +56,10 @@ type (
 		logger          bark.Logger
 		reporter        metrics.Reporter
 
-		lk     sync.Mutex
-		opened int32
-		closed int32
+		lk      sync.Mutex
+		opened  int32
+		closed  int32
+		drained int32
 	}
 
 	// This struct is created by writePump after writing message to stream.
@@ -140,17 +141,42 @@ func (conn *connection) open() error {
 	return nil
 }
 
+func (conn *connection) isShuttingDown() bool {
+	select {
+	case <-conn.shuttingDownCh:
+		// already shutdown
+		return true
+	default:
+	}
+
+	return false
+}
+
+// stopWritePump should drain the pump after getting the lock
+func (conn *connection) stopWritePump() {
+	conn.lk.Lock()
+	conn.stopWritePumpWithLock()
+	conn.lk.Unlock()
+}
+
+// Note: this needs to be called with the conn lock held!
+func (conn *connection) stopWritePumpWithLock() {
+	if !conn.isShuttingDown() {
+		close(conn.shuttingDownCh)
+		if ok := common.AwaitWaitGroup(&conn.writeMsgPumpWG, defaultWGTimeout); !ok {
+			conn.logger.Warn("writeMsgPumpWG timed out")
+		}
+		conn.logger.Info("stopped write pump")
+		atomic.StoreInt32(&conn.drained, 1)
+	}
+}
 func (conn *connection) close() {
 	conn.lk.Lock()
 	defer conn.lk.Unlock()
 
 	if atomic.LoadInt32(&conn.closed) == 0 {
 		// First shutdown the write pump to make sure we don't leave any message without ack
-		close(conn.shuttingDownCh)
-		if ok := common.AwaitWaitGroup(&conn.writeMsgPumpWG, defaultWGTimeout); !ok {
-			conn.logger.Warn("writeMsgPumpWG timed out")
-		}
-
+		conn.stopWritePumpWithLock()
 		// Now shutdown the read pump and drain all inflight messages
 		close(conn.closeCh)
 		if ok := common.AwaitWaitGroup(&conn.readAckPumpWG, defaultWGTimeout); !ok {
@@ -213,6 +239,14 @@ func (conn *connection) writeMessagesPump() {
 			// Connection is closed.  Bail out of the pump and close stream
 			return
 		}
+	}
+}
+
+func (conn *connection) handleReconfigCmd(reconfigInfo *cherami.ReconfigureInfo) {
+	select {
+	case conn.reconfigureCh <- reconfigureInfo{eventType: reconfigureCmdReconfigureType, reconfigureID: reconfigInfo.GetUpdateUUID()}:
+	default:
+		conn.logger.WithField(common.TagReconfigureID, common.FmtReconfigureID(reconfigInfo.GetUpdateUUID())).Warn("Reconfigure channel is full.  Drop reconfigure command.")
 	}
 }
 
@@ -283,14 +317,22 @@ func (conn *connection) readAcksPump() {
 					}
 				} else if cmd.GetType() == cherami.InputHostCommandType_RECONFIGURE {
 					conn.reporter.IncCounter(metrics.PublishReconfigureRate, nil, 1)
-					reconfigInfo := cmd.Reconfigure
-					conn.logger.WithField(common.TagReconfigureID, common.FmtReconfigureID(reconfigInfo.GetUpdateUUID())).Info("Reconfigure command received from InputHost.")
-					select {
-					case conn.reconfigureCh <- reconfigureInfo{eventType: reconfigureCmdReconfigureType, reconfigureID: reconfigInfo.GetUpdateUUID()}:
-					default:
-						conn.logger.WithField(common.TagReconfigureID, common.FmtReconfigureID(reconfigInfo.GetUpdateUUID())).Warn("Reconfigure channel is full.  Drop reconfigure command.")
-					}
+					rInfo := cmd.Reconfigure
+					conn.logger.WithField(common.TagReconfigureID, common.FmtReconfigureID(rInfo.GetUpdateUUID())).Info("Reconfigure command received from InputHost.")
+					conn.handleReconfigCmd(rInfo)
+				} else if cmd.GetType() == cherami.InputHostCommandType_DRAIN {
+					// drain all inflight messages
+					// reconfigure to pick up new extents if any
+					conn.reporter.IncCounter(metrics.PublishDrainRate, nil, 1)
+					// start draining by just stopping the write pump.
+					// this makes sure, we don't send any new messages.
+					// the read pump will exit when the server completes the drain
+					go conn.stopWritePump()
+					rInfo := cmd.Reconfigure
+					conn.logger.WithField(common.TagReconfigureID, common.FmtReconfigureID(rInfo.GetUpdateUUID())).Info("Drain command received from InputHost.")
+					conn.handleReconfigCmd(rInfo)
 				}
+
 			}
 		}
 	}
@@ -300,8 +342,16 @@ func (conn *connection) isOpened() bool {
 	return atomic.LoadInt32(&conn.opened) != 0
 }
 
+// isClosed should return true if either closed it set
+// or if "drain" is set, which means the connection has already
+// stopped the write pump.
+// This is needed to make sure if reconfigure gives the same
+// inputhost, we should open up a new connection object (most
+// likely for a new extent). In the worst case, if for some reason
+// the controller returns the same old extent which is draining,
+// the server will anyway reject the connection
 func (conn *connection) isClosed() bool {
-	return atomic.LoadInt32(&conn.closed) != 0
+	return (atomic.LoadInt32(&conn.closed) != 0 || atomic.LoadInt32(&conn.drained) != 0)
 }
 
 func (e *ackChannelClosedError) Error() string {

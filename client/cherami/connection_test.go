@@ -23,12 +23,14 @@ package cherami
 import (
 	"errors"
 	"io"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	_ "fmt"
 	_ "strconv"
 
+	"github.com/pborman/uuid"
 	"github.com/uber/cherami-client-go/common"
 	"github.com/uber/cherami-client-go/common/metrics"
 	mc "github.com/uber/cherami-client-go/mocks/clients/cherami"
@@ -195,6 +197,39 @@ func (s *ConnectionSuite) TestAckClosedByInputHost() {
 	//inputHostClient.AssertExpectations(s.T())
 }
 
+func (s *ConnectionSuite) TestClientDrain() {
+	conn, inputHostClient, messagesCh := createConnection()
+
+	appendTicker := time.NewTicker(5 * time.Millisecond)
+	defer appendTicker.Stop()
+
+	// setup inputhost to send a DRAIN command and then an EOF
+	inputHostClient.On("Write", mock.Anything).Return(nil)
+	inputHostClient.On("Flush").Return(nil)
+	inputHostClient.On("Read").Return(wrapDrainInCommand(&cherami.ReconfigureInfo{
+		UpdateUUID: common.StringPtr(uuid.New()),
+	}), nil).WaitUntil(appendTicker.C).Once()
+	inputHostClient.On("Read").Return(nil, io.EOF).Once()
+	inputHostClient.On("Done").Return(nil)
+
+	conn.open()
+	s.True(conn.isOpened(), "Connection not opened.")
+
+	message := &cherami.PutMessage{
+		ID:   common.StringPtr("1"),
+		Data: []byte("test"),
+	}
+
+	requestDone := make(chan *PublisherReceipt, 1)
+
+	messagesCh <- putMessageRequest{message, requestDone}
+	<-time.After(10 * time.Millisecond)
+	// drain must be set
+	s.Equal(int32(1), atomic.LoadInt32(&conn.drained))
+	// closed must return true as well
+	s.True(conn.isClosed())
+}
+
 func (s *ConnectionSuite) TestClientClosed() {
 	conn, inputHostClient, messagesCh := createConnection()
 
@@ -356,6 +391,14 @@ func wrapAckInCommand(ack *cherami.PutMessageAck) *cherami.InputHostCommand {
 	cmd := cherami.NewInputHostCommand()
 	cmd.Type = common.CheramiInputHostCommandTypePtr(cherami.InputHostCommandType_ACK)
 	cmd.Ack = ack
+
+	return cmd
+}
+
+func wrapDrainInCommand(reconfigure *cherami.ReconfigureInfo) *cherami.InputHostCommand {
+	cmd := cherami.NewInputHostCommand()
+	cmd.Type = common.CheramiInputHostCommandTypePtr(cherami.InputHostCommandType_DRAIN)
+	cmd.Reconfigure = reconfigure
 
 	return cmd
 }
