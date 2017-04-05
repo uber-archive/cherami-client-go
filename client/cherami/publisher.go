@@ -26,10 +26,10 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/uber/cherami-thrift/.generated/go/cherami"
 	"github.com/uber/cherami-client-go/common"
 	"github.com/uber/cherami-client-go/common/backoff"
 	"github.com/uber/cherami-client-go/common/metrics"
+	"github.com/uber/cherami-thrift/.generated/go/cherami"
 	"github.com/uber/tchannel-go"
 	"github.com/uber/tchannel-go/thrift"
 
@@ -70,12 +70,12 @@ var _ Publisher = (*publisherImpl)(nil)
 // NewPublisher constructs a new Publisher object
 func NewPublisher(client *clientImpl, path string, maxInflightMessagesPerConnection int) Publisher {
 	base := basePublisher{
-		client:                           client,
-		retryPolicy:                      createDefaultPublisherRetryPolicy(),
-		path:        			  path,
-		logger:      			  client.options.Logger.WithField(common.TagDstPth, common.FmtDstPth(path)),
-		reporter:    			  client.options.MetricsReporter,
-		reconfigurationPollingInterval:   client.options.ReconfigurationPollingInterval,
+		client:                         client,
+		retryPolicy:                    createDefaultPublisherRetryPolicy(),
+		path:                           path,
+		logger:                         client.options.Logger.WithField(common.TagDstPth, common.FmtDstPth(path)),
+		reporter:                       client.options.MetricsReporter,
+		reconfigurationPollingInterval: client.options.ReconfigurationPollingInterval,
 	}
 	publisher := &publisherImpl{
 		basePublisher:                    base,
@@ -182,8 +182,10 @@ func (s *publisherImpl) Publish(message *PublisherMessage) *PublisherReceipt {
 
 		select {
 		case receipt = <-srCh:
+			s.reporter.IncCounter(metrics.PublisherMessageFailed, nil, 1)
 			return receipt.Error
 		case <-timeoutTimer.C:
+			s.reporter.IncCounter(metrics.PublisherMessageTimedout, nil, 1)
 			return ErrMessageTimedout
 		}
 	}

@@ -60,6 +60,13 @@ type (
 		opened  int32
 		closed  int32
 		drained int32
+
+		sentMsgs        int64 // no: of messages sent to the inputhost
+		sentAcks        int64 // no: of messages successfully acked
+		sentNacks       int64 // no: of messages nacked (STATUS_FAILED)
+		sentThrottled   int64 // no: of messages throttled
+		failedMsgs      int64 // no: of failed messages *after* we successfully wrote to the stream
+		writeFailedMsgs int64 // no: of messages failed to even write to the stream
 	}
 
 	// This struct is created by writePump after writing message to stream.
@@ -80,6 +87,7 @@ type (
 const (
 	defaultMaxInflightMessages = 1000
 	defaultWGTimeout           = time.Minute
+	defaultDrainTimeout        = time.Minute
 )
 
 func newConnection(client cherami.TChanBIn, wsConnector WSConnector, path string, messages <-chan putMessageRequest,
@@ -168,6 +176,9 @@ func (conn *connection) stopWritePumpWithLock() {
 		}
 		conn.logger.Info("stopped write pump")
 		atomic.StoreInt32(&conn.drained, 1)
+		// now make sure we spawn a routine to wait for drain and
+		// close the connection if needed
+		go conn.waitForDrain()
 	}
 }
 func (conn *connection) close() {
@@ -193,7 +204,14 @@ func (conn *connection) close() {
 		}
 
 		atomic.StoreInt32(&conn.closed, 1)
-		conn.logger.Info("Input host connection closed.")
+		conn.logger.WithFields(bark.Fields{
+			`sentMsgs`:        conn.sentMsgs,
+			`sentAcks`:        conn.sentAcks,
+			`sentNacks`:       conn.sentNacks,
+			`sentThrottled`:   conn.sentThrottled,
+			`failedMsgs`:      conn.failedMsgs,
+			`writeFailedMsgs`: conn.writeFailedMsgs,
+		}).Info("Input host connection closed.")
 
 		// trigger a reconfiguration due to connection closed
 		select {
@@ -222,6 +240,7 @@ func (conn *connection) writeMessagesPump() {
 
 			if err == nil {
 				conn.replyCh <- &messageResponse{pr.message.GetID(), pr.messageAck, pr.message.GetUserContext()}
+				conn.sentMsgs++
 			} else {
 				conn.reporter.IncCounter(metrics.PublishMessageFailedRate, nil, 1)
 				conn.logger.WithField(common.TagMsgID, common.FmtMsgID(pr.message.GetID())).Infof("Error writing message to stream: %v", err)
@@ -231,6 +250,7 @@ func (conn *connection) writeMessagesPump() {
 					Error:       err,
 					UserContext: pr.message.GetUserContext(),
 				}
+				conn.writeFailedMsgs++
 
 				// Write failed, rebuild connection
 				go conn.close()
@@ -256,7 +276,7 @@ func (conn *connection) readAcksPump() {
 	inflightMessages := make(map[string]*messageResponse)
 	// This map is needed when we receive a reply out of order before the inflightMessages is populated
 	earlyReplyAcks := make(map[string]*PublisherReceipt)
-	defer failInflightMessages(inflightMessages)
+	defer conn.failInflightMessages(inflightMessages)
 
 	// Flag which is set when AckStream is closed by InputHost
 	isEOF := false
@@ -310,10 +330,10 @@ func (conn *connection) readAcksPump() {
 						// Probably we received the ack even before the inflightMessages map is populated.
 						// Let's put it in the earlyReplyAcks map so we can immediately complete the response when seen by this pump.
 						//conn.logger.WithField(common.TagAckID, common.FmtAckID(ack.GetID())).Debug("Received Ack before populating inflight messages.")
-						earlyReplyAcks[ack.GetID()] = processMessageAck(ack)
+						earlyReplyAcks[ack.GetID()] = conn.processMessageAck(ack)
 					} else {
 						delete(inflightMessages, ack.GetID())
-						messageResp.completion <- processMessageAck(ack)
+						messageResp.completion <- conn.processMessageAck(ack)
 					}
 				} else if cmd.GetType() == cherami.InputHostCommandType_RECONFIGURE {
 					conn.reporter.IncCounter(metrics.PublishReconfigureRate, nil, 1)
@@ -358,19 +378,42 @@ func (e *ackChannelClosedError) Error() string {
 	return "Ack channel closed."
 }
 
-func processMessageAck(messageAck *cherami.PutMessageAck) *PublisherReceipt {
+func (conn *connection) processMessageAck(messageAck *cherami.PutMessageAck) *PublisherReceipt {
 	ret := &PublisherReceipt{
 		ID:          messageAck.GetID(),
 		UserContext: messageAck.GetUserContext(),
 	}
 
-	if messageAck.GetStatus() != cherami.Status_OK {
+	stat := messageAck.GetStatus()
+	if stat != cherami.Status_OK {
+		if stat == cherami.Status_THROTTLED {
+			conn.sentThrottled++
+		} else {
+			conn.sentNacks++
+		}
 		ret.Error = errors.New(messageAck.GetMessage())
 	} else {
+		conn.sentAcks++
 		ret.Receipt = messageAck.GetReceipt()
 	}
 
 	return ret
+}
+
+func (conn *connection) waitForDrain() {
+	// wait for some timeout period and close the connection
+	// this is needed because even though server closes the
+	// connection, we never call "stream.Read" until we have some
+	// messages in-flight, which will not be the case when we have already drained
+	drainTimer := time.NewTimer(defaultDrainTimeout)
+	defer drainTimer.Stop()
+	select {
+	case <-conn.closeCh:
+		// already closed
+		return
+	case <-drainTimer.C:
+		go conn.close()
+	}
 }
 
 // populateInflightMapUtil is used to populate the inflightMessages Map,
@@ -388,12 +431,13 @@ func populateInflightMapUtil(inflightMessages map[string]*messageResponse, early
 	}
 }
 
-func failInflightMessages(inflightMessages map[string]*messageResponse) {
+func (conn *connection) failInflightMessages(inflightMessages map[string]*messageResponse) {
 	for id, messageResp := range inflightMessages {
 		messageResp.completion <- &PublisherReceipt{
 			ID:          id,
 			Error:       &ackChannelClosedError{},
 			UserContext: messageResp.userContext,
 		}
+		conn.failedMsgs++
 	}
 }
