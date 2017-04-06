@@ -162,14 +162,14 @@ func (conn *connection) isShuttingDown() bool {
 }
 
 // stopWritePump should drain the pump after getting the lock
-func (conn *connection) stopWritePump() {
+func (conn *connection) stopWritePumpAndClose() {
 	conn.lk.Lock()
-	conn.stopWritePumpWithLock()
+	conn.stopWritePumpWithLockAndClose()
 	conn.lk.Unlock()
 }
 
 // Note: this needs to be called with the conn lock held!
-func (conn *connection) stopWritePumpWithLock() {
+func (conn *connection) stopWritePumpWithLockAndClose() {
 	if !conn.isShuttingDown() {
 		close(conn.shuttingDownCh)
 		if ok := common.AwaitWaitGroup(&conn.writeMsgPumpWG, defaultWGTimeout); !ok {
@@ -179,49 +179,12 @@ func (conn *connection) stopWritePumpWithLock() {
 		atomic.StoreInt32(&conn.drained, 1)
 		// now make sure we spawn a routine to wait for drain and
 		// close the connection if needed
-		go conn.waitForDrain()
+		go conn.waitForDrainAndClose()
 	}
 }
 func (conn *connection) close() {
-	conn.lk.Lock()
-	defer conn.lk.Unlock()
-
-	// no need to close if we are already closing and/or draining
-	if atomic.LoadInt32(&conn.closed) == 0 {
-		// First shutdown the write pump to make sure we don't leave any message without ack
-		conn.stopWritePumpWithLock()
-		// Now shutdown the read pump and drain all inflight messages
-		close(conn.closeCh)
-		if ok := common.AwaitWaitGroup(&conn.readAckPumpWG, defaultWGTimeout); !ok {
-			conn.logger.Warn("readAckPumpWG timed out")
-		}
-
-		// Both pumps are shutdown.  Close the underlying stream.
-		if conn.cancel != nil {
-			conn.cancel()
-		}
-
-		if conn.inputHostStream != nil {
-			conn.inputHostStream.Done()
-		}
-
-		atomic.StoreInt32(&conn.closed, 1)
-		conn.logger.WithFields(bark.Fields{
-			`sentMsgs`:        conn.sentMsgs,
-			`sentAcks`:        conn.sentAcks,
-			`sentNacks`:       conn.sentNacks,
-			`sentThrottled`:   conn.sentThrottled,
-			`failedMsgs`:      conn.failedMsgs,
-			`writeFailedMsgs`: conn.writeFailedMsgs,
-		}).Info("Input host connection closed.")
-
-		// trigger a reconfiguration due to connection closed
-		select {
-		case conn.reconfigureCh <- reconfigureInfo{eventType: connClosedReconfigureType, reconfigureID: conn.connKey}:
-		default:
-			conn.logger.Info("Reconfigure channel is full.  Drop reconfigure command due to connection close.")
-		}
-	}
+	// First shutdown the write pump to make sure we don't leave any message without ack
+	conn.stopWritePumpAndClose()
 }
 
 func (conn *connection) writeMessagesPump() {
@@ -349,7 +312,7 @@ func (conn *connection) readAcksPump() {
 					// start draining by just stopping the write pump.
 					// this makes sure, we don't send any new messages.
 					// the read pump will exit when the server completes the drain
-					go conn.stopWritePump()
+					go conn.stopWritePumpAndClose()
 					rInfo := cmd.Reconfigure
 					conn.logger.WithField(common.TagReconfigureID, common.FmtReconfigureID(rInfo.GetUpdateUUID())).Info("Drain command received from InputHost.")
 					conn.handleReconfigCmd(rInfo)
@@ -418,7 +381,47 @@ func (conn *connection) isAlreadyDrained() bool {
 	return false
 }
 
-func (conn *connection) waitForDrain() {
+func (conn *connection) finalClose() {
+	conn.lk.Lock()
+	defer conn.lk.Unlock()
+
+	// XXX: do we even need this now. At this point we know for sure that this is going to be just one call
+	if atomic.LoadInt32(&conn.closed) == 0 {
+		// Now shutdown the read pump and drain all inflight messages
+		close(conn.closeCh)
+		if ok := common.AwaitWaitGroup(&conn.readAckPumpWG, defaultWGTimeout); !ok {
+			conn.logger.Warn("readAckPumpWG timed out")
+		}
+
+		// Both pumps are shutdown.  Close the underlying stream.
+		if conn.cancel != nil {
+			conn.cancel()
+		}
+
+		if conn.inputHostStream != nil {
+			conn.inputHostStream.Done()
+		}
+
+		atomic.StoreInt32(&conn.closed, 1)
+		conn.logger.WithFields(bark.Fields{
+			`sentMsgs`:        conn.sentMsgs,
+			`sentAcks`:        conn.sentAcks,
+			`sentNacks`:       conn.sentNacks,
+			`sentThrottled`:   conn.sentThrottled,
+			`failedMsgs`:      conn.failedMsgs,
+			`writeFailedMsgs`: conn.writeFailedMsgs,
+		}).Info("Input host connection closed.")
+
+		// trigger a reconfiguration due to connection closed
+		select {
+		case conn.reconfigureCh <- reconfigureInfo{eventType: connClosedReconfigureType, reconfigureID: conn.connKey}:
+		default:
+			conn.logger.Info("Reconfigure channel is full.  Drop reconfigure command due to connection close.")
+		}
+	}
+}
+
+func (conn *connection) waitForDrainAndClose() {
 	// wait for some timeout period and close the connection
 	// this is needed because even though server closes the
 	// connection, we never call "stream.Read" until we have some
@@ -436,11 +439,11 @@ func (conn *connection) waitForDrain() {
 		// check if we got the acks for all sent messages
 		if conn.isAlreadyDrained() {
 			conn.logger.Infof("Inputhost connection drained completely")
-			go conn.close()
+			conn.finalClose()
 			return
 		}
 	case <-drainTimer.C:
-		go conn.close()
+		conn.finalClose()
 		return
 	}
 }
