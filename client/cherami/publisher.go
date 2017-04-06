@@ -276,8 +276,11 @@ func (s *publisherImpl) reconfigurePublisher() {
 		for host, inputHostConn := range s.connections {
 			if _, ok := currentHosts[host]; !ok {
 				connLogger := s.logger.WithField(common.TagHostIP, common.FmtHostIP(inputHostConn.connKey))
-				connLogger.Info("Closing connection to InputHost after reconfiguration.")
-				inputHostConn.close()
+				// only close if we are not draining
+				if !inputHostConn.isDraining() {
+					connLogger.Info("Closing connection to InputHost after reconfiguration.")
+					inputHostConn.close()
+				}
 			}
 		}
 

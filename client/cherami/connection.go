@@ -187,7 +187,7 @@ func (conn *connection) close() {
 	defer conn.lk.Unlock()
 
 	// no need to close if we are already closing and/or draining
-	if !conn.isClosed() {
+	if atomic.LoadInt32(&conn.closed) == 0 {
 		// First shutdown the write pump to make sure we don't leave any message without ack
 		conn.stopWritePumpWithLock()
 		// Now shutdown the read pump and drain all inflight messages
@@ -376,6 +376,10 @@ func (conn *connection) isClosed() bool {
 	return (atomic.LoadInt32(&conn.closed) != 0 || atomic.LoadInt32(&conn.drained) != 0)
 }
 
+func (conn *connection) isDraining() bool {
+	return atomic.LoadInt32(&conn.drained) != 0
+}
+
 func (e *ackChannelClosedError) Error() string {
 	return "Ack channel closed."
 }
@@ -389,13 +393,13 @@ func (conn *connection) processMessageAck(messageAck *cherami.PutMessageAck) *Pu
 	stat := messageAck.GetStatus()
 	if stat != cherami.Status_OK {
 		if stat == cherami.Status_THROTTLED {
-			conn.sentThrottled++
+			atomic.AddInt64(&conn.sentThrottled, 1)
 		} else {
-			conn.sentNacks++
+			atomic.AddInt64(&conn.sentNacks, 1)
 		}
 		ret.Error = errors.New(messageAck.GetMessage())
 	} else {
-		conn.sentAcks++
+		atomic.AddInt64(&conn.sentAcks, 1)
 		ret.Receipt = messageAck.GetReceipt()
 	}
 
