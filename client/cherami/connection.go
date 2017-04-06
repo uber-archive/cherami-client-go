@@ -88,6 +88,7 @@ const (
 	defaultMaxInflightMessages = 1000
 	defaultWGTimeout           = time.Minute
 	defaultDrainTimeout        = time.Minute
+	defaultCheckDrainTimeout   = 5 * time.Second
 )
 
 func newConnection(client cherami.TChanBIn, wsConnector WSConnector, path string, messages <-chan putMessageRequest,
@@ -185,7 +186,8 @@ func (conn *connection) close() {
 	conn.lk.Lock()
 	defer conn.lk.Unlock()
 
-	if atomic.LoadInt32(&conn.closed) == 0 {
+	// no need to close if we are already closing and/or draining
+	if !conn.isClosed() {
 		// First shutdown the write pump to make sure we don't leave any message without ack
 		conn.stopWritePumpWithLock()
 		// Now shutdown the read pump and drain all inflight messages
@@ -240,7 +242,7 @@ func (conn *connection) writeMessagesPump() {
 
 			if err == nil {
 				conn.replyCh <- &messageResponse{pr.message.GetID(), pr.messageAck, pr.message.GetUserContext()}
-				conn.sentMsgs++
+				atomic.AddInt64(&conn.sentMsgs, 1)
 			} else {
 				conn.reporter.IncCounter(metrics.PublishMessageFailedRate, nil, 1)
 				conn.logger.WithField(common.TagMsgID, common.FmtMsgID(pr.message.GetID())).Infof("Error writing message to stream: %v", err)
@@ -400,6 +402,18 @@ func (conn *connection) processMessageAck(messageAck *cherami.PutMessageAck) *Pu
 	return ret
 }
 
+// isAlreadyDrained returns true when we have sent response for all the sent messages
+// response should include acks, nacks and throttled messages
+// Note: failed messages and writeFailed messages should not be counted
+func (conn *connection) isAlreadyDrained() bool {
+	respSent := atomic.LoadInt64(&conn.sentAcks) + atomic.LoadInt64(&conn.sentNacks) + atomic.LoadInt64(&conn.sentThrottled)
+	if respSent == atomic.LoadInt64(&conn.sentMsgs) {
+		return true
+	}
+
+	return false
+}
+
 func (conn *connection) waitForDrain() {
 	// wait for some timeout period and close the connection
 	// this is needed because even though server closes the
@@ -407,12 +421,23 @@ func (conn *connection) waitForDrain() {
 	// messages in-flight, which will not be the case when we have already drained
 	drainTimer := time.NewTimer(defaultDrainTimeout)
 	defer drainTimer.Stop()
+
+	checkDrainTimer := time.NewTimer(defaultCheckDrainTimeout)
+	defer checkDrainTimer.Stop()
 	select {
 	case <-conn.closeCh:
 		// already closed
 		return
+	case <-checkDrainTimer.C:
+		// check if we got the acks for all sent messages
+		if conn.isAlreadyDrained() {
+			conn.logger.Infof("Inputhost connection drained completely")
+			go conn.close()
+			return
+		}
 	case <-drainTimer.C:
 		go conn.close()
+		return
 	}
 }
 
