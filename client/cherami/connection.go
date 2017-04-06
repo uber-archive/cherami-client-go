@@ -56,10 +56,8 @@ type (
 		logger          bark.Logger
 		reporter        metrics.Reporter
 
-		lk      sync.Mutex
-		opened  int32
-		closed  int32
-		drained int32
+		lk     sync.Mutex
+		opened int32
 
 		sentMsgs        int64 // no: of messages sent to the inputhost
 		sentAcks        int64 // no: of messages successfully acked
@@ -176,12 +174,15 @@ func (conn *connection) stopWritePumpWithLockAndClose() {
 			conn.logger.Warn("writeMsgPumpWG timed out")
 		}
 		conn.logger.Info("stopped write pump")
-		atomic.StoreInt32(&conn.drained, 1)
 		// now make sure we spawn a routine to wait for drain and
 		// close the connection if needed
 		go conn.waitForDrainAndClose()
 	}
 }
+
+// close always stops the write pump first and then
+// waits for some time to make sure we give a chance to
+// drain inflight messages and then close the read pump
 func (conn *connection) close() {
 	// First shutdown the write pump to make sure we don't leave any message without ack
 	conn.stopWritePumpAndClose()
@@ -336,11 +337,7 @@ func (conn *connection) isOpened() bool {
 // the controller returns the same old extent which is draining,
 // the server will anyway reject the connection
 func (conn *connection) isClosed() bool {
-	return (atomic.LoadInt32(&conn.closed) != 0 || atomic.LoadInt32(&conn.drained) != 0)
-}
-
-func (conn *connection) isDraining() bool {
-	return atomic.LoadInt32(&conn.drained) != 0
+	return conn.isShuttingDown()
 }
 
 func (e *ackChannelClosedError) Error() string {
@@ -385,43 +382,40 @@ func (conn *connection) finalClose() {
 	conn.lk.Lock()
 	defer conn.lk.Unlock()
 
-	// XXX: do we even need this now. At this point we know for sure that this is going to be just one call
-	if atomic.LoadInt32(&conn.closed) == 0 {
-		// Now shutdown the read pump and drain all inflight messages
-		close(conn.closeCh)
-		if ok := common.AwaitWaitGroup(&conn.readAckPumpWG, defaultWGTimeout); !ok {
-			conn.logger.Warn("readAckPumpWG timed out")
-		}
+	// Now shutdown the read pump and drain all inflight messages
+	close(conn.closeCh)
+	if ok := common.AwaitWaitGroup(&conn.readAckPumpWG, defaultWGTimeout); !ok {
+		conn.logger.Warn("readAckPumpWG timed out")
+	}
 
-		// Both pumps are shutdown.  Close the underlying stream.
-		if conn.cancel != nil {
-			conn.cancel()
-		}
+	// Both pumps are shutdown.  Close the underlying stream.
+	if conn.cancel != nil {
+		conn.cancel()
+	}
 
-		if conn.inputHostStream != nil {
-			conn.inputHostStream.Done()
-		}
+	if conn.inputHostStream != nil {
+		conn.inputHostStream.Done()
+	}
 
-		atomic.StoreInt32(&conn.closed, 1)
-		conn.logger.WithFields(bark.Fields{
-			`sentMsgs`:        conn.sentMsgs,
-			`sentAcks`:        conn.sentAcks,
-			`sentNacks`:       conn.sentNacks,
-			`sentThrottled`:   conn.sentThrottled,
-			`failedMsgs`:      conn.failedMsgs,
-			`writeFailedMsgs`: conn.writeFailedMsgs,
-		}).Info("Input host connection closed.")
+	conn.logger.WithFields(bark.Fields{
+		`sentMsgs`:        conn.sentMsgs,
+		`sentAcks`:        conn.sentAcks,
+		`sentNacks`:       conn.sentNacks,
+		`sentThrottled`:   conn.sentThrottled,
+		`failedMsgs`:      conn.failedMsgs,
+		`writeFailedMsgs`: conn.writeFailedMsgs,
+	}).Info("Input host connection closed.")
 
-		// trigger a reconfiguration due to connection closed
-		select {
-		case conn.reconfigureCh <- reconfigureInfo{eventType: connClosedReconfigureType, reconfigureID: conn.connKey}:
-		default:
-			conn.logger.Info("Reconfigure channel is full.  Drop reconfigure command due to connection close.")
-		}
+	// trigger a reconfiguration due to connection closed
+	select {
+	case conn.reconfigureCh <- reconfigureInfo{eventType: connClosedReconfigureType, reconfigureID: conn.connKey}:
+	default:
+		conn.logger.Info("Reconfigure channel is full.  Drop reconfigure command due to connection close.")
 	}
 }
 
 func (conn *connection) waitForDrainAndClose() {
+	defer conn.finalClose()
 	// wait for some timeout period and close the connection
 	// this is needed because even though server closes the
 	// connection, we never call "stream.Read" until we have some
@@ -439,11 +433,9 @@ func (conn *connection) waitForDrainAndClose() {
 		// check if we got the acks for all sent messages
 		if conn.isAlreadyDrained() {
 			conn.logger.Infof("Inputhost connection drained completely")
-			conn.finalClose()
 			return
 		}
 	case <-drainTimer.C:
-		conn.finalClose()
 		return
 	}
 }
