@@ -425,18 +425,21 @@ func (conn *connection) waitForDrainAndClose() {
 
 	checkDrainTimer := time.NewTimer(defaultCheckDrainTimeout)
 	defer checkDrainTimer.Stop()
-	select {
-	case <-conn.closeCh:
-		// already closed
-		return
-	case <-checkDrainTimer.C:
-		// check if we got the acks for all sent messages
-		if conn.isAlreadyDrained() {
-			conn.logger.Infof("Inputhost connection drained completely")
+	for {
+		checkDrainTimer.Reset(defaultCheckDrainTimeout)
+		select {
+		case <-conn.closeCh:
+			// already closed
+			return
+		case <-checkDrainTimer.C:
+			// check if we got the acks for all sent messages
+			if conn.isAlreadyDrained() {
+				conn.logger.Infof("Inputhost connection drained completely")
+				return
+			}
+		case <-drainTimer.C:
 			return
 		}
-	case <-drainTimer.C:
-		return
 	}
 }
 
