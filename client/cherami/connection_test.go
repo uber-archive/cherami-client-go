@@ -23,7 +23,6 @@ package cherami
 import (
 	"errors"
 	"io"
-	"sync/atomic"
 	"testing"
 	"time"
 
@@ -224,9 +223,7 @@ func (s *ConnectionSuite) TestClientDrain() {
 
 	messagesCh <- putMessageRequest{message, requestDone}
 	<-time.After(10 * time.Millisecond)
-	// drain must be set
-	s.Equal(int32(1), atomic.LoadInt32(&conn.drained))
-	// closed must return true as well
+	// we must have drained and so closed must return true
 	s.True(conn.isClosed())
 }
 

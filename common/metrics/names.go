@@ -55,6 +55,10 @@ const (
 	PublishNumConnections = "cherami.publish.connections"
 	// PublishNumInflightMessagess is the number of inflight messages hold locally by publisher
 	PublishNumInflightMessagess = "cherami.publish.message.inflights"
+	// PublisherMessageFailed is the number of failed messages on the publisher
+	PublisherMessageFailed = "cherami.publisher.message.failed"
+	// PublisherMessageTimedout is the number of messages timed out on the publisher
+	PublisherMessageTimedout = "cherami.publisher.message.timedout"
 
 	// ConsumeMessageRate is the rate of message got from output
 	ConsumeMessageRate = "cherami.consume.message.rate"
@@ -91,8 +95,11 @@ var MetricDefs = map[MetricName]MetricType{
 	PublishMessageLatency:       Timer,
 	PublishAckRate:              Counter,
 	PublishReconfigureRate:      Counter,
+	PublishDrainRate:            Counter,
 	PublishNumConnections:       Gauge,
 	PublishNumInflightMessagess: Gauge,
+	PublisherMessageFailed:      Counter,
+	PublisherMessageTimedout:    Counter,
 
 	ConsumeMessageRate:      Counter,
 	ConsumeCreditRate:       Counter,
