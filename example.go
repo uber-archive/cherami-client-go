@@ -60,6 +60,7 @@ func main() {
 	// Here we directly connect to cherami running on host:port
 	cClient, err := cherami.NewClient("cherami-example", *host, *port, &cherami.ClientOptions{
 		Timeout: time.Minute,
+		AuthProvider: cherami.NewBypassAuthProvider(),
 	})
 	exitIfError(err)
 

@@ -23,8 +23,8 @@ package cherami
 import (
 	"time"
 
-	"github.com/uber/cherami-thrift/.generated/go/cherami"
 	"github.com/uber/cherami-client-go/common/metrics"
+	"github.com/uber/cherami-thrift/.generated/go/cherami"
 
 	"github.com/uber-common/bark"
 )
@@ -168,6 +168,8 @@ type (
 		// Interval for polling input/output host updates. Normally client doesn't need to explicitly set this option
 		// because the default setting should work fine. This is only useful in testing or other edge scenarios
 		ReconfigurationPollingInterval time.Duration
+		// AuthProvider provides the authentication information in client side
+		AuthProvider AuthProvider
 	}
 
 	// Task represents the task queued in Cherami

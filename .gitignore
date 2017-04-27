@@ -9,6 +9,7 @@ test
 test.log
 .rewrite
 vendor/
+.idea/
 
 # produced executable(s)
 example

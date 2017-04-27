@@ -138,3 +138,23 @@ func (s *ClientSuite) TestClientOptionsNoLogger() {
 	s.NotNil(cheramiImpl.options.Logger)
 	cheramiClient.Close()
 }
+
+// TestClientOptionsBypassAuthProvider tests the client with BypassAuthProvider
+func (s *ClientSuite) TestClientOptionsBypassAuthProvider() {
+	ip, err := tchannel.ListenIP()
+	s.Nil(err)
+	listenIP := ip.String()
+
+	// setup options with just the AuthProvider
+	options := &ClientOptions{
+		AuthProvider: NewBypassAuthProvider(),
+	}
+
+	cheramiClient, err := NewClient("cherami-client-test-logger", listenIP, 0, options)
+	s.Nil(err)
+
+	cheramiImpl := cheramiClient.(*clientImpl)
+
+	s.NotNil(cheramiImpl.options.AuthProvider)
+	cheramiClient.Close()
+}

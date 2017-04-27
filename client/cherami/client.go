@@ -278,11 +278,21 @@ func (c *clientImpl) CreateConsumer(request *CreateConsumerRequest) Consumer {
 
 func (c *clientImpl) createContext() (thrift.Context, context.CancelFunc) {
 	ctx, cancel := thrift.NewContext(c.options.Timeout)
-	return thrift.WithHeaders(ctx, map[string]string{
+	ctx = thrift.WithHeaders(ctx, map[string]string{
 		common.HeaderClientVersion: common.ClientVersion,
 		common.HeaderUserName:      envUserName,
 		common.HeaderHostName:      envHostName,
-	}), cancel
+	})
+
+	if c.options.AuthProvider != nil {
+		var err error
+		ctx, err = c.options.AuthProvider.CreateSecurityContext(ctx, c.options)
+		if err != nil {
+			c.options.Logger.WithField(common.TagErr, err).Warn("Failed to create security context in client")
+		}
+	}
+
+	return ctx, cancel
 }
 
 func (c *clientImpl) ReadPublisherOptions(path string) (*cherami.ReadPublisherOptionsResult_, error) {
