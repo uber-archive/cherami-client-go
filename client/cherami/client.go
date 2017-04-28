@@ -286,7 +286,7 @@ func (c *clientImpl) createContext() (thrift.Context, context.CancelFunc) {
 
 	if c.options.AuthProvider != nil {
 		var err error
-		ctx, err = c.options.AuthProvider.CreateSecurityContext(ctx, c.options)
+		ctx, err = c.options.AuthProvider.CreateSecurityContext(ctx)
 		if err != nil {
 			c.options.Logger.WithField(common.TagErr, err).Warn("Failed to create security context in client")
 		}

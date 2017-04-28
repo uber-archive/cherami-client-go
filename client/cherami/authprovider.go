@@ -28,7 +28,7 @@ type (
 	// AuthProvider provides authentication information in client side
 	AuthProvider interface {
 		// CreateSecurityContext creates security context
-		CreateSecurityContext(ctx thrift.Context, options *ClientOptions) (thrift.Context, error)
+		CreateSecurityContext(ctx thrift.Context) (thrift.Context, error)
 	}
 
 	// BypassAuthProvider is a dummy implementation for AuthProvider
@@ -41,6 +41,6 @@ func NewBypassAuthProvider() *BypassAuthProvider {
 }
 
 // CreateSecurityContext creates security context
-func (t *BypassAuthProvider) CreateSecurityContext(ctx thrift.Context, options *ClientOptions) (thrift.Context, error) {
+func (t *BypassAuthProvider) CreateSecurityContext(ctx thrift.Context) (thrift.Context, error) {
 	return ctx, nil
 }
