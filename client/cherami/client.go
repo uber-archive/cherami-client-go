@@ -58,6 +58,10 @@ const (
 	clientRetryMaxInterval                = 10 * time.Second
 	clientRetryExpirationInterval         = 1 * time.Minute
 	defaultReconfigurationPollingInterval = 10 * time.Second
+
+	destinationTag   = "destination"
+	publisherTypeTag = "publisherType"
+	consumerGroupTag = "consumerGroup"
 )
 
 var envUserName = os.Getenv("USER")
@@ -252,11 +256,22 @@ func (c *clientImpl) GetQueueDepthInfo(request *cherami.GetQueueDepthInfoRequest
 }
 
 func (c *clientImpl) CreatePublisher(request *CreatePublisherRequest) Publisher {
+	reporter := c.options.MetricsReporter
+	if reporter != nil {
+		childReporter := reporter.GetChildReporter(map[string]string{
+			destinationTag: getMetricTagValueForPath(request.Path),
+			publisherTypeTag: fmt.Sprintf("%v", request.PublisherType),
+		})
+		if childReporter != nil {
+			reporter = childReporter
+		}
+	}
+
 	switch request.PublisherType {
 	case PublisherTypeStreaming:
-		return NewPublisher(c, request.Path, request.MaxInflightMessagesPerConnection)
+		return NewPublisher2(c, request.Path, request.MaxInflightMessagesPerConnection, reporter)
 	case PublisherTypeNonStreaming:
-		return newTChannelBatchPublisher(c, c.connection, request.Path, c.options.Logger, c.options.MetricsReporter, c.options.ReconfigurationPollingInterval)
+		return newTChannelBatchPublisher(c, c.connection, request.Path, c.options.Logger, reporter, c.options.ReconfigurationPollingInterval)
 	}
 	return nil
 }
@@ -273,7 +288,18 @@ func (c *clientImpl) CreateConsumer(request *CreateConsumerRequest) Consumer {
 		request.Options = c.options
 	}
 
-	return newConsumer(c, request.Path, request.ConsumerGroupName, request.ConsumerName, request.PrefetchCount, request.Options)
+	reporter := c.options.MetricsReporter
+	if reporter != nil {
+		childReporter := reporter.GetChildReporter(map[string]string{
+			destinationTag: getMetricTagValueForPath(request.Path),
+			consumerGroupTag: getMetricTagValueForPath(request.ConsumerGroupName),
+		})
+		if childReporter != nil {
+			reporter = childReporter
+		}
+	}
+
+	return newConsumer(c, request.Path, request.ConsumerGroupName, request.ConsumerName, request.PrefetchCount, request.Options, reporter)
 }
 
 func (c *clientImpl) createContext() (thrift.Context, context.CancelFunc) {
@@ -413,4 +439,8 @@ func isTransientError(err error) bool {
 	default:
 		return true
 	}
+}
+
+func getMetricTagValueForPath(path string) string {
+	return strings.Replace(path, "/", "_", -1)
 }

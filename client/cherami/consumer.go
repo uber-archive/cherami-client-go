@@ -67,7 +67,7 @@ type (
 	}
 )
 
-func newConsumer(client *clientImpl, path, consumerGroupName, consumerName string, prefetchSize int, options *ClientOptions) Consumer {
+func newConsumer(client *clientImpl, path, consumerGroupName, consumerName string, prefetchSize int, options *ClientOptions, reporter metrics.Reporter) Consumer {
 	consumer := &consumerImpl{
 		client:            client,
 		options:           options,
@@ -79,7 +79,7 @@ func newConsumer(client *clientImpl, path, consumerGroupName, consumerName strin
 		closingCh:         make(chan struct{}),
 		isClosing:         0,
 		logger:            client.options.Logger.WithFields(bark.Fields{common.TagDstPth: common.FmtDstPth(path), common.TagCnsPth: common.FmtCnsPth(consumerGroupName)}),
-		reporter:          client.options.MetricsReporter,
+		reporter:          reporter,
 		wsConnector:       NewWSConnector(),
 	}
 
