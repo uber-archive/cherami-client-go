@@ -68,13 +68,20 @@ const (
 var _ Publisher = (*publisherImpl)(nil)
 
 // NewPublisher constructs a new Publisher object
+// Deprecated: NewPublisher is deprecated, please use NewPublisher2
 func NewPublisher(client *clientImpl, path string, maxInflightMessagesPerConnection int) Publisher {
+	client.options.Logger.Warn("NewPublisher is a depredcated method, please use the new method NewPublisherWithReporter")
+	return NewPublisherWithReporter(client, path, maxInflightMessagesPerConnection, client.options.MetricsReporter)
+}
+
+// NewPublisherWithReporter constructs a new Publisher object
+func NewPublisherWithReporter(client *clientImpl, path string, maxInflightMessagesPerConnection int, reporter metrics.Reporter) Publisher {
 	base := basePublisher{
 		client:                         client,
 		retryPolicy:                    createDefaultPublisherRetryPolicy(),
 		path:                           path,
 		logger:                         client.options.Logger.WithField(common.TagDstPth, common.FmtDstPth(path)),
-		reporter:                       client.options.MetricsReporter,
+		reporter:                       reporter,
 		reconfigurationPollingInterval: client.options.ReconfigurationPollingInterval,
 	}
 	publisher := &publisherImpl{
