@@ -58,10 +58,6 @@ const (
 	clientRetryMaxInterval                = 10 * time.Second
 	clientRetryExpirationInterval         = 1 * time.Minute
 	defaultReconfigurationPollingInterval = 10 * time.Second
-
-	destinationTag   = "destination"
-	publisherTypeTag = "publisherType"
-	consumerGroupTag = "consumerGroup"
 )
 
 var envUserName = os.Getenv("USER")
@@ -259,8 +255,8 @@ func (c *clientImpl) CreatePublisher(request *CreatePublisherRequest) Publisher 
 	reporter := c.options.MetricsReporter
 	if reporter != nil {
 		childReporter := reporter.GetChildReporter(map[string]string{
-			destinationTag: getMetricTagValueForPath(request.Path),
-			publisherTypeTag: fmt.Sprintf("%v", request.PublisherType),
+			metrics.DestinationTag: getMetricTagValueForPath(request.Path),
+			metrics.PublisherTypeTag: fmt.Sprintf("%v", request.PublisherType),
 		})
 		if childReporter != nil {
 			reporter = childReporter
@@ -291,8 +287,8 @@ func (c *clientImpl) CreateConsumer(request *CreateConsumerRequest) Consumer {
 	reporter := c.options.MetricsReporter
 	if reporter != nil {
 		childReporter := reporter.GetChildReporter(map[string]string{
-			destinationTag: getMetricTagValueForPath(request.Path),
-			consumerGroupTag: getMetricTagValueForPath(request.ConsumerGroupName),
+			metrics.DestinationTag: getMetricTagValueForPath(request.Path),
+			metrics.ConsumerGroupTag: getMetricTagValueForPath(request.ConsumerGroupName),
 		})
 		if childReporter != nil {
 			reporter = childReporter

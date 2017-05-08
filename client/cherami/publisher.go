@@ -70,6 +70,7 @@ var _ Publisher = (*publisherImpl)(nil)
 // NewPublisher constructs a new Publisher object
 // Deprecated: NewPublisher is deprecated, please use NewPublisher2
 func NewPublisher(client *clientImpl, path string, maxInflightMessagesPerConnection int) Publisher {
+	client.options.Logger.Warn("NewPublisher is a depredcated method, please use the new method")
 	return NewPublisher2(client, path, maxInflightMessagesPerConnection, client.options.MetricsReporter)
 }
 

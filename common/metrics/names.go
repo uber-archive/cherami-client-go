@@ -38,6 +38,18 @@ const (
 	ServiceNameTagName = "serviceName"
 	// DeploymentTagName is the tag name to identify current deployment name
 	DeploymentTagName = "deployment"
+	// DestinationTag is the tag name to identify destination
+	DestinationTag   = "destination"
+	// PublisherTypeTag is the tag name to identify publisher type
+	PublisherTypeTag = "publisherType"
+	// ConsumerGroupTag is the tag name to identify consumer group
+	ConsumerGroupTag = "consumerGroup"
+	// PidTag is the tag name to identify process id
+	PidTag        = "pid"
+	// ClientTag is the tag name to identify client
+	ClientTag     = "client"
+	// HostNameTag is the tag name to identify host name
+	HostNameTag   = "hostName"
 
 	// PublishMessageRate is the rate of message wrote to input
 	PublishMessageRate = "cherami.publish.message.rate"
