@@ -265,7 +265,7 @@ func (c *clientImpl) CreatePublisher(request *CreatePublisherRequest) Publisher 
 
 	switch request.PublisherType {
 	case PublisherTypeStreaming:
-		return NewPublisher2(c, request.Path, request.MaxInflightMessagesPerConnection, reporter)
+		return NewPublisherWithReporter(c, request.Path, request.MaxInflightMessagesPerConnection, reporter)
 	case PublisherTypeNonStreaming:
 		return newTChannelBatchPublisher(c, c.connection, request.Path, c.options.Logger, reporter, c.options.ReconfigurationPollingInterval)
 	}
