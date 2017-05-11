@@ -252,22 +252,11 @@ func (c *clientImpl) GetQueueDepthInfo(request *cherami.GetQueueDepthInfoRequest
 }
 
 func (c *clientImpl) CreatePublisher(request *CreatePublisherRequest) Publisher {
-	reporter := c.options.MetricsReporter
-	if reporter != nil {
-		childReporter := reporter.GetChildReporter(map[string]string{
-			metrics.DestinationTag: getMetricTagValueForPath(request.Path),
-			metrics.PublisherTypeTag: fmt.Sprintf("%v", request.PublisherType),
-		})
-		if childReporter != nil {
-			reporter = childReporter
-		}
-	}
-
 	switch request.PublisherType {
 	case PublisherTypeStreaming:
-		return NewPublisherWithReporter(c, request.Path, request.MaxInflightMessagesPerConnection, reporter)
+		return NewPublisherWithReporter(c, request.Path, request.MaxInflightMessagesPerConnection, c.options.MetricsReporter)
 	case PublisherTypeNonStreaming:
-		return newTChannelBatchPublisher(c, c.connection, request.Path, c.options.Logger, reporter, c.options.ReconfigurationPollingInterval)
+		return newTChannelBatchPublisher(c, c.connection, request.Path, c.options.Logger, c.options.MetricsReporter, c.options.ReconfigurationPollingInterval)
 	}
 	return nil
 }
@@ -284,18 +273,7 @@ func (c *clientImpl) CreateConsumer(request *CreateConsumerRequest) Consumer {
 		request.Options = c.options
 	}
 
-	reporter := c.options.MetricsReporter
-	if reporter != nil {
-		childReporter := reporter.GetChildReporter(map[string]string{
-			metrics.DestinationTag: getMetricTagValueForPath(request.Path),
-			metrics.ConsumerGroupTag: getMetricTagValueForPath(request.ConsumerGroupName),
-		})
-		if childReporter != nil {
-			reporter = childReporter
-		}
-	}
-
-	return newConsumer(c, request.Path, request.ConsumerGroupName, request.ConsumerName, request.PrefetchCount, request.Options, reporter)
+	return newConsumer(c, request.Path, request.ConsumerGroupName, request.ConsumerName, request.PrefetchCount, request.Options, c.options.MetricsReporter)
 }
 
 func (c *clientImpl) createContext() (thrift.Context, context.CancelFunc) {
