@@ -189,7 +189,9 @@ func (s *publisherImpl) Publish(message *PublisherMessage) *PublisherReceipt {
 
 		select {
 		case receipt = <-srCh:
-			s.reporter.IncCounter(metrics.PublisherMessageFailed, nil, 1)
+			if receipt.Error != nil {
+				s.reporter.IncCounter(metrics.PublisherMessageFailed, nil, 1)
+			}
 			return receipt.Error
 		case <-timeoutTimer.C:
 			s.reporter.IncCounter(metrics.PublisherMessageTimedout, nil, 1)
