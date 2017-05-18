@@ -72,6 +72,8 @@ const (
 	// PublisherMessageTimedout is the number of messages timed out on the publisher
 	PublisherMessageTimedout = "cherami.publisher.message.timedout"
 
+	// ConsumeMessageFailedRate is the rate of message try reading from output but failed
+	ConsumeMessageFailedRate = "cherami.consume.message.failed"
 	// ConsumeMessageRate is the rate of message got from output
 	ConsumeMessageRate = "cherami.consume.message.rate"
 	// ConsumeCreditRate is the rate of credit sent to output

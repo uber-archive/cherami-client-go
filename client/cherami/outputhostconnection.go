@@ -205,6 +205,7 @@ func (conn *outputHostConnection) readMessagesPump() {
 
 		cmd, err := conn.outputHostStream.Read()
 		if err != nil {
+			conn.reporter.IncCounter(metrics.ConsumeMessageFailedRate, nil, 1)
 			// Error reading from stream.  Time to close and bail out.
 			conn.logger.Infof("Error reading OutputHost Message Stream: %v", err)
 			// Stream is closed.  Close the connection and bail out
