@@ -39,17 +39,17 @@ const (
 	// DeploymentTagName is the tag name to identify current deployment name
 	DeploymentTagName = "deployment"
 	// DestinationTag is the tag name to identify destination
-	DestinationTag   = "destination"
+	DestinationTag = "destination"
 	// PublisherTypeTag is the tag name to identify publisher type
 	PublisherTypeTag = "publisherType"
 	// ConsumerGroupTag is the tag name to identify consumer group
 	ConsumerGroupTag = "consumerGroup"
 	// PidTag is the tag name to identify process id
-	PidTag        = "pid"
+	PidTag = "pid"
 	// ClientTag is the tag name to identify client
-	ClientTag     = "client"
+	ClientTag = "client"
 	// HostNameTag is the tag name to identify host name
-	HostNameTag   = "hostName"
+	HostNameTag = "hostName"
 
 	// PublishMessageRate is the rate of message wrote to input
 	PublishMessageRate = "cherami.publish.message.rate"
@@ -72,8 +72,9 @@ const (
 	// PublisherMessageTimedout is the number of messages timed out on the publisher
 	PublisherMessageTimedout = "cherami.publisher.message.timedout"
 
-	// ConsumeMessageFailedRate is the rate of message try reading from output but failed
-	ConsumeMessageFailedRate = "cherami.consume.message.failed"
+	// OutputReadFailedRate is the rate of output stream read failures
+	OutputReadFailedRate = "cherami.output.read.failed"
+
 	// ConsumeMessageRate is the rate of message got from output
 	ConsumeMessageRate = "cherami.consume.message.rate"
 	// ConsumeCreditRate is the rate of credit sent to output
@@ -115,18 +116,18 @@ var MetricDefs = map[MetricName]MetricType{
 	PublisherMessageFailed:      Counter,
 	PublisherMessageTimedout:    Counter,
 
-	ConsumeMessageFailedRate: Counter,
-	ConsumeMessageRate:       Counter,
-	ConsumeCreditRate:        Counter,
-	ConsumeCreditFailedRate:  Counter,
-	ConsumeCreditLatency:     Timer,
-	ConsumeAckRate:           Counter,
-	ConsumeAckFailedRate:     Counter,
-	ConsumeNackRate:          Counter,
-	ConsumeReconfigureRate:   Counter,
-	ConsumeNumConnections:    Gauge,
-	ConsumeLocalCredits:      Gauge,
-	ProcessLatency:           Timer,
-	ProcessAckLatency:        Timer,
-	ProcessNackLatency:       Timer,
+	OutputReadFailedRate:    Counter,
+	ConsumeMessageRate:      Counter,
+	ConsumeCreditRate:       Counter,
+	ConsumeCreditFailedRate: Counter,
+	ConsumeCreditLatency:    Timer,
+	ConsumeAckRate:          Counter,
+	ConsumeAckFailedRate:    Counter,
+	ConsumeNackRate:         Counter,
+	ConsumeReconfigureRate:  Counter,
+	ConsumeNumConnections:   Gauge,
+	ConsumeLocalCredits:     Gauge,
+	ProcessLatency:          Timer,
+	ProcessAckLatency:       Timer,
+	ProcessNackLatency:      Timer,
 }
