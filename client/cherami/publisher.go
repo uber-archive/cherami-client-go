@@ -184,6 +184,7 @@ func (s *publisherImpl) Publish(message *PublisherMessage) *PublisherReceipt {
 		srCh := make(chan *PublisherReceipt, 1)
 		_, err := s.PublishAsync(message, srCh)
 		if err != nil {
+			s.reporter.IncCounter(metrics.PublisherMessageFailed, nil, 1)
 			return err
 		}
 

@@ -39,17 +39,17 @@ const (
 	// DeploymentTagName is the tag name to identify current deployment name
 	DeploymentTagName = "deployment"
 	// DestinationTag is the tag name to identify destination
-	DestinationTag   = "destination"
+	DestinationTag = "destination"
 	// PublisherTypeTag is the tag name to identify publisher type
 	PublisherTypeTag = "publisherType"
 	// ConsumerGroupTag is the tag name to identify consumer group
 	ConsumerGroupTag = "consumerGroup"
 	// PidTag is the tag name to identify process id
-	PidTag        = "pid"
+	PidTag = "pid"
 	// ClientTag is the tag name to identify client
-	ClientTag     = "client"
+	ClientTag = "client"
 	// HostNameTag is the tag name to identify host name
-	HostNameTag   = "hostName"
+	HostNameTag = "hostName"
 
 	// PublishMessageRate is the rate of message wrote to input
 	PublishMessageRate = "cherami.publish.message.rate"
@@ -71,7 +71,8 @@ const (
 	PublisherMessageFailed = "cherami.publisher.message.failed"
 	// PublisherMessageTimedout is the number of messages timed out on the publisher
 	PublisherMessageTimedout = "cherami.publisher.message.timedout"
-
+	// ConsumeReadFailed is the metric of consume read failures
+	ConsumeReadFailed = "cherami.consume.read.failed"
 	// ConsumeMessageRate is the rate of message got from output
 	ConsumeMessageRate = "cherami.consume.message.rate"
 	// ConsumeCreditRate is the rate of credit sent to output
@@ -113,6 +114,7 @@ var MetricDefs = map[MetricName]MetricType{
 	PublisherMessageFailed:      Counter,
 	PublisherMessageTimedout:    Counter,
 
+	ConsumeReadFailed:       Counter,
 	ConsumeMessageRate:      Counter,
 	ConsumeCreditRate:       Counter,
 	ConsumeCreditFailedRate: Counter,
