@@ -72,8 +72,8 @@ const (
 	// PublisherMessageTimedout is the number of messages timed out on the publisher
 	PublisherMessageTimedout = "cherami.publisher.message.timedout"
 
-	// OutputReadFailedRate is the rate of output stream read failures
-	OutputReadFailedRate = "cherami.output.read.failed"
+	// ConsumeReadFailedRate is the rate of consume read failures
+	ConsumeReadFailedRate = "cherami.consume.read.failed"
 
 	// ConsumeMessageRate is the rate of message got from output
 	ConsumeMessageRate = "cherami.consume.message.rate"
@@ -116,7 +116,7 @@ var MetricDefs = map[MetricName]MetricType{
 	PublisherMessageFailed:      Counter,
 	PublisherMessageTimedout:    Counter,
 
-	OutputReadFailedRate:    Counter,
+	ConsumeReadFailedRate:   Counter,
 	ConsumeMessageRate:      Counter,
 	ConsumeCreditRate:       Counter,
 	ConsumeCreditFailedRate: Counter,
