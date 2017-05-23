@@ -252,7 +252,7 @@ func (s *publisherImpl) reconfigurePublisher() {
 	default:
 		var conn *connection
 
-		var publisherOptions *cherami.ReadPublisherOptionsResult_
+		publisherOptions := &cherami.ReadPublisherOptionsResult_{}
 		if atomic.LoadUint32(&s.paused) == 0 {
 			publisherOptions, err = s.readPublisherOptions()
 			if err != nil {

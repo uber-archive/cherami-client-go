@@ -230,7 +230,7 @@ func (c *consumerImpl) reconfigureConsumer() {
 	default:
 		var conn *outputHostConnection
 
-		var consumerOptions *cherami.ReadConsumerGroupHostsResult_
+		consumerOptions := &cherami.ReadConsumerGroupHostsResult_{}
 		if atomic.LoadUint32(&c.paused) == 0 {
 			consumerOptions, err = c.client.ReadConsumerGroupHosts(c.path, c.consumerGroupName)
 			if err != nil {
