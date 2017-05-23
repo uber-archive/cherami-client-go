@@ -27,8 +27,8 @@ import (
 
 	"github.com/stretchr/testify/suite"
 
-	"github.com/uber/cherami-thrift/.generated/go/cherami"
 	"github.com/uber/cherami-client-go/common"
+	"github.com/uber/cherami-thrift/.generated/go/cherami"
 
 	"github.com/stretchr/testify/require"
 )

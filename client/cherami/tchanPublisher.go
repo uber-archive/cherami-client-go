@@ -78,11 +78,11 @@ var _ Publisher = (*tchannelBatchPublisher)(nil)
 
 func newTChannelBatchPublisher(client Client, tchan *tchannel.Channel, path string, logger bark.Logger, metricsReporter metrics.Reporter, reconfigurationPollingInterval time.Duration) Publisher {
 	base := basePublisher{
-		client:      			client,
-		retryPolicy: 			createDefaultPublisherRetryPolicy(),
-		path:				path,
-		logger:      			logger.WithField(common.TagDstPth, common.FmtDstPth(path)),
-		reporter:    			metricsReporter,
+		client:                         client,
+		retryPolicy:                    createDefaultPublisherRetryPolicy(),
+		path:                           path,
+		logger:                         logger.WithField(common.TagDstPth, common.FmtDstPth(path)),
+		reporter:                       metricsReporter,
 		reconfigurationPollingInterval: reconfigurationPollingInterval,
 	}
 	return &tchannelBatchPublisher{
@@ -152,6 +152,16 @@ func (p *tchannelBatchPublisher) Close() {
 	p.reporter.UpdateGauge(metrics.PublishNumConnections, nil, int64(0))
 	atomic.StoreInt32(&p.closed, 1)
 	p.logger.Info("Publisher Closed.")
+}
+
+func (p *tchannelBatchPublisher) Pause() {
+	p.logger.Error("Pause() is not supported for batch publisher")
+	return
+}
+
+func (p *tchannelBatchPublisher) Resume() {
+	p.logger.Error("Resume() is not supported for batch publisher")
+	return
 }
 
 // Publish publishes a message to cherami

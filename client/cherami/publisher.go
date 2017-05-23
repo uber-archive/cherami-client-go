@@ -49,6 +49,7 @@ type (
 		lk                               sync.Mutex
 		opened                           bool
 		closed                           bool
+		paused                           uint32
 		connections                      map[string]*connection
 		wsConnector                      WSConnector
 		reconfigurable                   *reconfigurable
@@ -61,14 +62,14 @@ type (
 )
 
 const (
-	maxDuration           time.Duration = 1<<62 - 1
-	defaultMessageTimeout               = time.Minute
+	defaultMessageTimeout = time.Minute
+	pauseError            = `Cherami publisher is paused`
 )
 
 var _ Publisher = (*publisherImpl)(nil)
 
 // NewPublisher constructs a new Publisher object
-// Deprecated: NewPublisher is deprecated, please use NewPublisher2
+// Deprecated: NewPublisher is deprecated, please use NewPublisherWithReporter
 func NewPublisher(client *clientImpl, path string, maxInflightMessagesPerConnection int) Publisher {
 	client.options.Logger.Warn("NewPublisher is a depredcated method, please use the new method NewPublisherWithReporter")
 	return NewPublisherWithReporter(client, path, maxInflightMessagesPerConnection, client.options.MetricsReporter)
@@ -147,6 +148,14 @@ func (s *publisherImpl) Open() error {
 	return nil
 }
 
+func (s *publisherImpl) Pause() {
+	atomic.StoreUint32(&s.paused, 1)
+}
+
+func (s *publisherImpl) Resume() {
+	atomic.StoreUint32(&s.paused, 0)
+}
+
 func (s *publisherImpl) Close() {
 	if atomic.CompareAndSwapInt32(&s.isClosing, 0, 1) {
 		close(s.closingCh)
@@ -176,6 +185,9 @@ func (s *publisherImpl) Close() {
 
 // Publish can be used to synchronously publish a message to Cherami
 func (s *publisherImpl) Publish(message *PublisherMessage) *PublisherReceipt {
+	if atomic.LoadUint32(&s.paused) > 0 {
+		return &PublisherReceipt{Error: fmt.Errorf(pauseError)}
+	}
 	timeoutTimer := time.NewTimer(defaultMessageTimeout)
 	defer timeoutTimer.Stop()
 
@@ -211,6 +223,9 @@ func (s *publisherImpl) Publish(message *PublisherMessage) *PublisherReceipt {
 // PublishAsync accepts a message, but returns immediately with the local
 // reference ID
 func (s *publisherImpl) PublishAsync(message *PublisherMessage, done chan<- *PublisherReceipt) (string, error) {
+	if atomic.LoadUint32(&s.paused) > 0 {
+		return "", fmt.Errorf(pauseError)
+	}
 
 	if !s.opened {
 		return "", fmt.Errorf("Cannot publish message to path '%s'. Publisher is not opened.", s.path)
@@ -229,22 +244,27 @@ func (s *publisherImpl) reconfigurePublisher() {
 	s.lk.Lock()
 	defer s.lk.Unlock()
 
+	var err error
+
 	select {
 	case <-s.closingCh:
 		s.logger.Info("Publisher is closing.  Ignore reconfiguration.")
 	default:
 		var conn *connection
 
-		publisherOptions, err := s.readPublisherOptions()
-		if err != nil {
-			s.logger.Infof("Error resolving input hosts: %v", err)
-			if _, ok := err.(*cherami.EntityNotExistsError); ok {
-				// Destination is deleted. Continue with reconfigure and close all connections
-				publisherOptions = &cherami.ReadPublisherOptionsResult_{}
-			} else {
-				// This is a potentially a transient error.
-				// Retry on next reconfigure
-				return
+		publisherOptions := &cherami.ReadPublisherOptionsResult_{}
+		if atomic.LoadUint32(&s.paused) == 0 {
+			publisherOptions, err = s.readPublisherOptions()
+			if err != nil {
+				s.logger.Infof("Error resolving input hosts: %v", err)
+				if _, ok := err.(*cherami.EntityNotExistsError); ok {
+					// Destination is deleted. Continue with reconfigure and close all connections
+					publisherOptions = &cherami.ReadPublisherOptionsResult_{}
+				} else {
+					// This is a potentially a transient error.
+					// Retry on next reconfigure
+					return
+				}
 			}
 		}
 
