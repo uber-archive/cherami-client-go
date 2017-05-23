@@ -94,6 +94,10 @@ type (
 		Open(deliveryCh chan Delivery) (chan Delivery, error)
 		// Closed all the connections to Cherami nodes for this consumer
 		Close()
+		// Pause consuming messages
+		Pause()
+		// Resume consuming messages
+		Resume()
 		// AckDelivery can be used by application to Ack a message so it is not delivered to any other consumer
 		AckDelivery(deliveryToken string) error
 		// NackDelivery can be used by application to Nack a message so it can be delivered to another consumer immediately
