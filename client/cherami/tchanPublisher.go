@@ -154,6 +154,14 @@ func (p *tchannelBatchPublisher) Close() {
 	p.logger.Info("Publisher Closed.")
 }
 
+func (p *tchannelBatchPublisher) Pause() {
+	return
+}
+
+func (p *tchannelBatchPublisher) Resume() {
+	return
+}
+
 // Publish publishes a message to cherami
 func (p *tchannelBatchPublisher) Publish(message *PublisherMessage) *PublisherReceipt {
 

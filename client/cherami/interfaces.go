@@ -56,6 +56,8 @@ type (
 	Publisher interface {
 		Open() error
 		Close()
+		Pause()
+		Resume()
 		Publish(message *PublisherMessage) *PublisherReceipt
 		PublishAsync(message *PublisherMessage, done chan<- *PublisherReceipt) (string, error)
 	}

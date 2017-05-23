@@ -49,6 +49,7 @@ type (
 		reconfigureCh     chan reconfigureInfo
 		closingCh         chan struct{}
 		isClosing         int32
+		paused            uint32
 		logger            bark.Logger
 		reporter          metrics.Reporter
 
@@ -191,6 +192,14 @@ func (c *consumerImpl) Close() {
 	c.opened = false
 }
 
+func (c *consumerImpl)  Pause(){
+	atomic.StoreUint32(&c.paused, 1)
+}
+
+func (c *consumerImpl)  Resume(){
+	atomic.StoreUint32(&c.paused, 0)
+}
+
 func (c *consumerImpl) AckDelivery(token string) error {
 	acknowledger, id, err := c.getAcknowledger(token)
 	if err != nil {
@@ -213,22 +222,27 @@ func (c *consumerImpl) reconfigureConsumer() {
 	c.lk.Lock()
 	defer c.lk.Unlock()
 
+	var err error
+
 	select {
 	case <-c.closingCh:
 		c.logger.Info("Consumer is closing.  Ignore reconfiguration.")
 	default:
 		var conn *outputHostConnection
 
-		consumerOptions, err := c.client.ReadConsumerGroupHosts(c.path, c.consumerGroupName)
-		if err != nil {
-			c.logger.Warnf("Error resolving output hosts: %v", err)
-			if _, ok := err.(*cherami.EntityNotExistsError); ok {
-				// ConsumerGroup is deleted. Continue with reconfigure and close all connections
-				consumerOptions = &cherami.ReadConsumerGroupHostsResult_{}
-			} else {
-				// This is a potentially a transient error.
-				// Retry on next reconfigure
-				return
+		var consumerOptions *cherami.ReadConsumerGroupHostsResult_
+		if atomic.LoadUint32(&c.paused) > 0 {
+			consumerOptions, err = c.client.ReadConsumerGroupHosts(c.path, c.consumerGroupName)
+			if err != nil {
+				c.logger.Warnf("Error resolving output hosts: %v", err)
+				if _, ok := err.(*cherami.EntityNotExistsError); ok {
+					// ConsumerGroup is deleted. Continue with reconfigure and close all connections
+					consumerOptions = &cherami.ReadConsumerGroupHostsResult_{}
+				} else {
+					// This is a potentially a transient error.
+					// Retry on next reconfigure
+					return
+				}
 			}
 		}
 
