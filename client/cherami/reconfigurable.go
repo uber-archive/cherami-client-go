@@ -23,8 +23,8 @@ package cherami
 import (
 	"time"
 
-	"github.com/uber/cherami-client-go/common"
 	"github.com/uber-common/bark"
+	"github.com/uber/cherami-client-go/common"
 )
 
 type (

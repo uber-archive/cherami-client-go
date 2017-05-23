@@ -192,11 +192,11 @@ func (c *consumerImpl) Close() {
 	c.opened = false
 }
 
-func (c *consumerImpl)  Pause(){
+func (c *consumerImpl) Pause() {
 	atomic.StoreUint32(&c.paused, 1)
 }
 
-func (c *consumerImpl)  Resume(){
+func (c *consumerImpl) Resume() {
 	atomic.StoreUint32(&c.paused, 0)
 }
 
@@ -231,7 +231,7 @@ func (c *consumerImpl) reconfigureConsumer() {
 		var conn *outputHostConnection
 
 		var consumerOptions *cherami.ReadConsumerGroupHostsResult_
-		if atomic.LoadUint32(&c.paused) > 0 {
+		if atomic.LoadUint32(&c.paused) == 0 {
 			consumerOptions, err = c.client.ReadConsumerGroupHosts(c.path, c.consumerGroupName)
 			if err != nil {
 				c.logger.Warnf("Error resolving output hosts: %v", err)

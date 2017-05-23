@@ -25,10 +25,10 @@ import (
 	"net/http"
 	"reflect"
 
-	"github.com/uber/cherami-thrift/.generated/go/cherami"
 	"github.com/uber/cherami-client-go/common"
 	"github.com/uber/cherami-client-go/common/websocket"
 	"github.com/uber/cherami-client-go/stream"
+	"github.com/uber/cherami-thrift/.generated/go/cherami"
 )
 
 type (

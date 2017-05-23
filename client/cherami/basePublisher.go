@@ -30,10 +30,10 @@ import (
 
 	"github.com/uber-common/bark"
 
-	"github.com/uber/cherami-thrift/.generated/go/cherami"
 	"github.com/uber/cherami-client-go/common"
 	"github.com/uber/cherami-client-go/common/backoff"
 	"github.com/uber/cherami-client-go/common/metrics"
+	"github.com/uber/cherami-thrift/.generated/go/cherami"
 )
 
 type (
@@ -41,14 +41,14 @@ type (
 	// common to all types of Publisher
 	// implementations
 	basePublisher struct {
-		idCounter      			 int64
-		path           			 string
-		client         			 Client
-		logger         			 bark.Logger
-		reporter       			 metrics.Reporter
-		retryPolicy    			 backoff.RetryPolicy
-		checksumOption 			 cherami.ChecksumOption
-		reconfigurationPollingInterval   time.Duration
+		idCounter                      int64
+		path                           string
+		client                         Client
+		logger                         bark.Logger
+		reporter                       metrics.Reporter
+		retryPolicy                    backoff.RetryPolicy
+		checksumOption                 cherami.ChecksumOption
+		reconfigurationPollingInterval time.Duration
 	}
 
 	// publishError represents a message publishing error

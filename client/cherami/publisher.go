@@ -62,8 +62,8 @@ type (
 )
 
 const (
-	defaultMessageTimeout               = time.Minute
-	pauseError = `Cherami publisher is paused because current zone is inactive`
+	defaultMessageTimeout = time.Minute
+	pauseError            = `Cherami publisher is paused`
 )
 
 var _ Publisher = (*publisherImpl)(nil)
@@ -148,11 +148,11 @@ func (s *publisherImpl) Open() error {
 	return nil
 }
 
-func (s *publisherImpl)  Pause(){
+func (s *publisherImpl) Pause() {
 	atomic.StoreUint32(&s.paused, 1)
 }
 
-func (s *publisherImpl)  Resume(){
+func (s *publisherImpl) Resume() {
 	atomic.StoreUint32(&s.paused, 0)
 }
 
@@ -253,7 +253,7 @@ func (s *publisherImpl) reconfigurePublisher() {
 		var conn *connection
 
 		var publisherOptions *cherami.ReadPublisherOptionsResult_
-		if atomic.LoadUint32(&s.paused) > 0 {
+		if atomic.LoadUint32(&s.paused) == 0 {
 			publisherOptions, err = s.readPublisherOptions()
 			if err != nil {
 				s.logger.Infof("Error resolving input hosts: %v", err)

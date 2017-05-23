@@ -32,7 +32,7 @@ type (
 	}
 
 	// BypassAuthProvider is a dummy implementation for AuthProvider
-	BypassAuthProvider struct {}
+	BypassAuthProvider struct{}
 )
 
 // NewBypassAuthProvider creates a dummy AuthProvider instance
