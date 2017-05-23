@@ -155,10 +155,12 @@ func (p *tchannelBatchPublisher) Close() {
 }
 
 func (p *tchannelBatchPublisher) Pause() {
+	p.logger.Error("Pause() is not supported for batch publisher")
 	return
 }
 
 func (p *tchannelBatchPublisher) Resume() {
+	p.logger.Error("Resume() is not supported for batch publisher")
 	return
 }
 

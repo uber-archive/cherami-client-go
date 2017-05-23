@@ -56,7 +56,11 @@ type (
 	Publisher interface {
 		Open() error
 		Close()
+		// Pause publishing. All publishing will fail until Resume() is called.
+		// Note: Pause/Resume APIs only work for streaming publishers(i.e. publish type is PublisherTypeStreaming)
+		// For non-streaming publishers, Pause/Resume APIs are no-op.
 		Pause()
+		// Resume publishing.
 		Resume()
 		Publish(message *PublisherMessage) *PublisherReceipt
 		PublishAsync(message *PublisherMessage, done chan<- *PublisherReceipt) (string, error)
