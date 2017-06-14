@@ -36,7 +36,7 @@ import (
 	mc "github.com/uber/cherami-client-go/mocks/clients/cherami"
 	"github.com/uber/cherami-thrift/.generated/go/cherami"
 
-	log "github.com/Sirupsen/logrus"
+	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/uber-common/bark"
