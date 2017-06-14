@@ -27,9 +27,9 @@ import (
 	"runtime/debug"
 	"time"
 
-	cthrift "github.com/uber/cherami-thrift/.generated/go/cherami"
-	"github.com/uber/cherami-client-go/client/cherami"
 	"github.com/apache/thrift/lib/go/thrift"
+	"github.com/uber/cherami-client-go/client/cherami"
+	cthrift "github.com/uber/cherami-thrift/.generated/go/cherami"
 )
 
 var host = flag.String("host", "127.0.0.1", "cherami-frontend host IP")
@@ -59,7 +59,7 @@ func main() {
 	// First, create the client to interact with Cherami
 	// Here we directly connect to cherami running on host:port
 	cClient, err := cherami.NewClient("cherami-example", *host, *port, &cherami.ClientOptions{
-		Timeout: time.Minute,
+		Timeout:      time.Minute,
 		AuthProvider: cherami.NewBypassAuthProvider(),
 	})
 	exitIfError(err)
