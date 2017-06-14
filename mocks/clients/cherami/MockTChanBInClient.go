@@ -21,8 +21,8 @@
 package cherami
 
 import (
-	"github.com/uber/cherami-thrift/.generated/go/cherami"
 	"github.com/uber/cherami-client-go/stream"
+	"github.com/uber/cherami-thrift/.generated/go/cherami"
 
 	"github.com/stretchr/testify/mock"
 	"github.com/uber/tchannel-go/thrift"

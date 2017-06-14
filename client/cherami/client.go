@@ -32,8 +32,8 @@ import (
 	"github.com/uber/cherami-client-go/common/metrics"
 	"github.com/uber/cherami-thrift/.generated/go/cherami"
 
-	log "github.com/Sirupsen/logrus"
 	"github.com/pborman/uuid"
+	log "github.com/sirupsen/logrus"
 	"github.com/uber-common/bark"
 	"github.com/uber/tchannel-go"
 	"github.com/uber/tchannel-go/thrift"

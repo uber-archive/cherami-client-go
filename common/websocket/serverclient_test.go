@@ -27,7 +27,7 @@ import (
 	"time"
 
 	// "github.com/stretchr/testify/mock"
-	log "github.com/Sirupsen/logrus"
+	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 )

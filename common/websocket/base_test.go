@@ -26,8 +26,8 @@ import (
 	"reflect"
 	"sync"
 
+	log "github.com/sirupsen/logrus"
 	"github.com/uber/cherami-thrift/.generated/go/cherami"
-	log "github.com/Sirupsen/logrus"
 )
 
 // -- Websocket Streaming Server -- //

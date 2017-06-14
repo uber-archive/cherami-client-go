@@ -37,7 +37,7 @@ import (
 
 	"github.com/uber/cherami-thrift/.generated/go/cherami"
 
-	log "github.com/Sirupsen/logrus"
+	log "github.com/sirupsen/logrus"
 	"github.com/uber/tchannel-go"
 	"github.com/uber/tchannel-go/hyperbahn"
 )

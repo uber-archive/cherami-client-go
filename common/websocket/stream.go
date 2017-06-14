@@ -27,9 +27,9 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/uber/cherami-client-go/common"
 	"github.com/apache/thrift/lib/go/thrift"
 	gorilla "github.com/gorilla/websocket"
+	"github.com/uber/cherami-client-go/common"
 )
 
 type (
