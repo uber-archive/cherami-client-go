@@ -59,6 +59,7 @@ type (
 		lk     sync.Mutex
 		opened int32
 		closed int32
+		wg     sync.WaitGroup
 
 		// We need this lock to protect writes to acksBatchCh after it getting closed
 		acksBatchLk     sync.RWMutex
@@ -132,12 +133,16 @@ func (conn *outputHostConnection) open() error {
 		}
 
 		// Now start the message pump
+		conn.wg.Add(1)
 		go conn.readMessagesPump()
+
+		conn.wg.Add(1)
 		go conn.writeCreditsPump()
 		// We only bail out of this pump when acksBatchCh is closed by consumerImpl after this connections is removed.
 		// This is the only guarantee we will not receive more acks on the channel and it is safe to shutdown the pump.
 		// Closing the pump earlier has the potential to cause deadlock between consumer writing acks and connection writing
 		// messages to deliveryCh.
+		conn.wg.Add(1)
 		go conn.writeAcksPump()
 
 		atomic.StoreInt32(&conn.opened, 1)
@@ -151,7 +156,7 @@ func (conn *outputHostConnection) close() {
 	conn.lk.Lock()
 	defer conn.lk.Unlock()
 
-	if atomic.LoadInt32(&conn.closed) == 0 {
+	if atomic.CompareAndSwapInt32(&conn.closed, 0, 1) {
 		select {
 		case conn.reconfigureCh <- reconfigureInfo{eventType: connClosedReconfigureType, reconfigureID: conn.connKey}:
 		default:
@@ -160,7 +165,7 @@ func (conn *outputHostConnection) close() {
 
 		close(conn.closeChannel)
 		conn.closeAcksBatchCh() // necessary to shutdown writeAcksPump within the connection
-		atomic.StoreInt32(&conn.closed, 1)
+		conn.wg.Wait()          // wait for the goroutines to finish up
 		conn.logger.Info("Output host connection closed.")
 	}
 }
@@ -188,6 +193,7 @@ func (conn *outputHostConnection) readMessagesPump() {
 
 	defer func() {
 		conn.logger.Info("readMessagesPump done")
+		conn.wg.Done()
 	}()
 
 	var localCredits int32
@@ -247,6 +253,7 @@ func (conn *outputHostConnection) writeCreditsPump() {
 			conn.cancel()
 		}
 		conn.outputHostStream.Done()
+		conn.wg.Done()
 	}()
 
 	// Send initial credits to OutputHost
@@ -276,6 +283,9 @@ func (conn *outputHostConnection) writeCreditsPump() {
 }
 
 func (conn *outputHostConnection) writeAcksPump() {
+
+	defer conn.wg.Done()
+
 	var buffer []string
 	var bufferTicker <-chan time.Time
 	var err error
