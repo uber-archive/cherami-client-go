@@ -36,9 +36,9 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/uber/cherami-thrift/.generated/go/cherami"
 	"github.com/uber/cherami-client-go/common"
 	mockWS "github.com/uber/cherami-client-go/mocks/common/websocket"
+	"github.com/uber/cherami-thrift/.generated/go/cherami"
 )
 
 type (

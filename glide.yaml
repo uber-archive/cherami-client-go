@@ -4,7 +4,7 @@ import:
   version: v1.20.0
   subpackages:
   - .generated/go/cherami
-- package: github.com/Sirupsen/logrus
+- package: github.com/sirupsen/logrus
 - package: github.com/apache/thrift
   subpackages:
   - lib/go/thrift

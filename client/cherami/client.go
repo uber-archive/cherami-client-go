@@ -32,8 +32,8 @@ import (
 	"github.com/uber/cherami-client-go/common/metrics"
 	"github.com/uber/cherami-thrift/.generated/go/cherami"
 
-	log "github.com/Sirupsen/logrus"
 	"github.com/pborman/uuid"
+	log "github.com/sirupsen/logrus"
 	"github.com/uber-common/bark"
 	"github.com/uber/tchannel-go"
 	"github.com/uber/tchannel-go/thrift"
@@ -357,9 +357,9 @@ func getDefaultLogger() bark.Logger {
 
 func getDefaultOptions() *ClientOptions {
 	return &ClientOptions{
-		Timeout:         		time.Minute,
-		Logger:          		getDefaultLogger(),
-		MetricsReporter: 		metrics.NewNullReporter(),
+		Timeout:                        time.Minute,
+		Logger:                         getDefaultLogger(),
+		MetricsReporter:                metrics.NewNullReporter(),
 		ReconfigurationPollingInterval: defaultReconfigurationPollingInterval,
 	}
 }
@@ -367,7 +367,7 @@ func getDefaultOptions() *ClientOptions {
 // verifyOptions is used to verify if we have a metrics reporter and
 // a logger. If not, just setup a default logger and a null reporter
 // it also validate the timeout is sane
-func verifyOptions(opts *ClientOptions) (*ClientOptions, error){
+func verifyOptions(opts *ClientOptions) (*ClientOptions, error) {
 	if opts == nil {
 		opts = getDefaultOptions()
 	}
