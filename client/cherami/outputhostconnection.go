@@ -37,7 +37,7 @@ import (
 )
 
 type (
-	OutputHostConnection struct {
+	outputHostConnection struct {
 		ackClient         cherami.TChanBOut
 		wsConnector       WSConnector
 		path              string
@@ -73,10 +73,10 @@ const (
 	ackBatchDelay   = time.Second / 10
 )
 
-func NewOutputHostConnection(ackClient cherami.TChanBOut, wsConnector WSConnector,
+func newOutputHostConnection(ackClient cherami.TChanBOut, wsConnector WSConnector,
 	path, consumerGroupName string, options *ClientOptions, deliveryCh chan<- Delivery,
 	reconfigureCh chan<- reconfigureInfo, connKey string, protocol cherami.Protocol,
-	prefetchSize int32, logger bark.Logger, reporter metrics.Reporter) *OutputHostConnection {
+	prefetchSize int32, logger bark.Logger, reporter metrics.Reporter) *outputHostConnection {
 
 	creditBatchSize := prefetchSize / 10
 	if creditBatchSize < 1 {
@@ -86,7 +86,7 @@ func NewOutputHostConnection(ackClient cherami.TChanBOut, wsConnector WSConnecto
 	// Don't check for nil options; better to panic here than panic later
 	common.ValidateTimeout(options.Timeout)
 
-	return &OutputHostConnection{
+	return &outputHostConnection{
 		connKey:           connKey,
 		protocol:          protocol,
 		ackClient:         ackClient,
@@ -107,7 +107,7 @@ func NewOutputHostConnection(ackClient cherami.TChanBOut, wsConnector WSConnecto
 	}
 }
 
-func (conn *OutputHostConnection) Open() error {
+func (conn *outputHostConnection) open() error {
 
 	if atomic.CompareAndSwapInt32(&conn.opened, 0, 1) {
 		switch conn.protocol {
@@ -148,8 +148,7 @@ func (conn *OutputHostConnection) Open() error {
 	return nil
 }
 
-// close initiates stoppage of all the internal go-routines
-func (conn *OutputHostConnection) close() {
+func (conn *outputHostConnection) close() {
 
 	if atomic.CompareAndSwapInt32(&conn.closed, 0, 1) {
 		select {
@@ -160,27 +159,24 @@ func (conn *OutputHostConnection) close() {
 
 		close(conn.closeChannel)
 		conn.closeAcksBatchCh() // necessary to shutdown writeAcksPump within the connection
+
+		conn.wg.Wait() // wait for the goroutines to finish up
 		conn.logger.Info("Output host connection closed.")
 	}
 }
 
-func (conn *OutputHostConnection) Close() {
-	conn.close()
-	conn.wg.Wait() // wait for the goroutines to finish up
-}
-
-func (conn *OutputHostConnection) isOpened() bool {
+func (conn *outputHostConnection) isOpened() bool {
 	return atomic.LoadInt32(&conn.opened) != 0
 }
 
-func (conn *OutputHostConnection) isClosed() bool {
+func (conn *outputHostConnection) isClosed() bool {
 	return atomic.LoadInt32(&conn.closed) != 0
 }
 
 // drainReadPipe reads and discards all messages on
 // the outputHostStream until it encounters
 // a read stream error
-func (conn *OutputHostConnection) drainReadPipe() {
+func (conn *outputHostConnection) drainReadPipe() {
 	for {
 		if _, err := conn.outputHostStream.Read(); err != nil {
 			return
@@ -188,11 +184,10 @@ func (conn *OutputHostConnection) drainReadPipe() {
 	}
 }
 
-func (conn *OutputHostConnection) readMessagesPump() {
+func (conn *outputHostConnection) readMessagesPump() {
 
 	defer func() {
 		conn.logger.Info("readMessagesPump done")
-		conn.close()
 		conn.wg.Done()
 	}()
 
@@ -215,6 +210,7 @@ func (conn *OutputHostConnection) readMessagesPump() {
 			// Error reading from stream.  Time to close and bail out.
 			conn.logger.Infof("Error reading OutputHost Message Stream: %v", err)
 			// Stream is closed.  Close the connection and bail out
+			conn.close()
 			return
 		}
 
@@ -245,20 +241,21 @@ func (conn *OutputHostConnection) readMessagesPump() {
 	}
 }
 
-func (conn *OutputHostConnection) writeCreditsPump() {
+func (conn *outputHostConnection) writeCreditsPump() {
 	// This will unblock any pending read operations on the stream.
 	defer func() {
 		if conn.cancel != nil {
 			conn.cancel()
 		}
 		conn.outputHostStream.Done()
-		conn.close()
 		conn.wg.Done()
 	}()
 
 	// Send initial credits to OutputHost
 	if err := conn.sendCredits(int32(conn.prefetchSize)); err != nil {
 		conn.logger.Infof("Error sending initialCredits to OutputHost: %v", err)
+
+		conn.close()
 		return
 	}
 
@@ -270,7 +267,8 @@ func (conn *OutputHostConnection) writeCreditsPump() {
 			//conn.logger.Infof("Sending credits to output host: %v", credits)
 			if err := conn.sendCredits(credits); err != nil {
 				conn.logger.Infof("Error sending creditBatchSize to OutputHost: %v", err)
-				return
+
+				conn.close()
 			}
 		case <-conn.closeChannel:
 			conn.logger.Info("WriteCreditsPump closing due to connection closed.")
@@ -279,7 +277,7 @@ func (conn *OutputHostConnection) writeCreditsPump() {
 	}
 }
 
-func (conn *OutputHostConnection) writeAcksPump() {
+func (conn *outputHostConnection) writeAcksPump() {
 
 	defer conn.wg.Done()
 
@@ -333,7 +331,7 @@ ackPump:
 	}
 }
 
-func (conn *OutputHostConnection) sendCredits(credits int32) error {
+func (conn *outputHostConnection) sendCredits(credits int32) error {
 	flows := cherami.NewControlFlow()
 	flows.Credits = common.Int32Ptr(credits)
 
@@ -350,11 +348,11 @@ func (conn *OutputHostConnection) sendCredits(credits int32) error {
 	return err
 }
 
-func (conn *OutputHostConnection) GetAcknowledgerID() string {
+func (conn *outputHostConnection) GetAcknowledgerID() string {
 	return conn.connKey
 }
 
-func (conn *OutputHostConnection) Ack(ids []string) error {
+func (conn *outputHostConnection) Ack(ids []string) error {
 	conn.acksBatchLk.RLock()
 	defer conn.acksBatchLk.RUnlock()
 
@@ -368,7 +366,7 @@ func (conn *OutputHostConnection) Ack(ids []string) error {
 	return nil
 }
 
-func (conn *OutputHostConnection) Nack(ids []string) error {
+func (conn *outputHostConnection) Nack(ids []string) error {
 	ackRequest := cherami.NewAckMessagesRequest()
 	ackRequest.NackIds = ids
 
@@ -379,7 +377,7 @@ func (conn *OutputHostConnection) Nack(ids []string) error {
 	return conn.ackClient.AckMessages(ctx, ackRequest)
 }
 
-func (conn *OutputHostConnection) ReportProcessingTime(t time.Duration, ack bool) {
+func (conn *outputHostConnection) ReportProcessingTime(t time.Duration, ack bool) {
 	conn.reporter.RecordTimer(metrics.ProcessLatency, nil, t)
 	if ack {
 		conn.reporter.RecordTimer(metrics.ProcessAckLatency, nil, t)
@@ -388,7 +386,7 @@ func (conn *OutputHostConnection) ReportProcessingTime(t time.Duration, ack bool
 	}
 }
 
-func (conn *OutputHostConnection) closeAcksBatchCh() {
+func (conn *outputHostConnection) closeAcksBatchCh() {
 	conn.acksBatchLk.Lock()
 	defer conn.acksBatchLk.Unlock()
 
