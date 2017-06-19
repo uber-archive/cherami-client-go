@@ -55,7 +55,7 @@ type (
 
 		lk             sync.Mutex
 		opened         bool
-		connections    map[string]*outputHostConnection
+		connections    map[string]*OutputHostConnection
 		wsConnector    WSConnector
 		reconfigurable *reconfigurable
 		wg             sync.WaitGroup
@@ -134,7 +134,7 @@ func (c *consumerImpl) Open(deliveryCh chan Delivery) (chan Delivery, error) {
 			tchanHostAddresses = hostProtocols[tchanProtocolIdx].GetHostAddresses()
 		}
 
-		c.connections = make(map[string]*outputHostConnection)
+		c.connections = make(map[string]*OutputHostConnection)
 		for idx, host := range chosenHostAddresses {
 			connKey := common.GetConnectionKey(host)
 			// ReadConsumerGroupHosts can return duplicates, so we need to dedupe to make sure we create a single connection for each host
@@ -230,7 +230,7 @@ func (c *consumerImpl) reconfigureConsumer() {
 	case <-c.closingCh:
 		c.logger.Info("Consumer is closing.  Ignore reconfiguration.")
 	default:
-		var conn *outputHostConnection
+		var conn *OutputHostConnection
 
 		consumerOptions := &cherami.ReadConsumerGroupHostsResult_{}
 		if atomic.LoadUint32(&c.paused) == 0 {
@@ -272,7 +272,7 @@ func (c *consumerImpl) reconfigureConsumer() {
 			}
 		}
 
-		currentHosts := make(map[string]*outputHostConnection)
+		currentHosts := make(map[string]*OutputHostConnection)
 		for idx, host := range chosenHostAddresses {
 			connKey := common.GetConnectionKey(host)
 			conn = c.connections[connKey]
@@ -317,7 +317,7 @@ func (c *consumerImpl) reconfigureConsumer() {
 	}
 }
 
-func (c *consumerImpl) createOutputHostConnection(tchanHostPort string, connKey string, protocol cherami.Protocol) (*outputHostConnection, error) {
+func (c *consumerImpl) createOutputHostConnection(tchanHostPort string, connKey string, protocol cherami.Protocol) (*OutputHostConnection, error) {
 	connLogger := c.logger.WithField(common.TagHostIP, common.FmtHostIP(connKey))
 
 	// We use a separate connection for acks to make sure response for acks won't get blocked behind streaming messages
@@ -327,11 +327,11 @@ func (c *consumerImpl) createOutputHostConnection(tchanHostPort string, connKey 
 		return nil, err
 	}
 
-	conn := newOutputHostConnection(ackClient, c.wsConnector, c.path, c.consumerGroupName, c.options, c.deliveryCh,
+	conn := NewOutputHostConnection(ackClient, c.wsConnector, c.path, c.consumerGroupName, c.options, c.deliveryCh,
 		c.reconfigureCh, connKey, protocol, int32(c.prefetchSize), connLogger, c.reporter)
 
 	// Now open the connection
-	err = conn.open()
+	err = conn.Open()
 	if err != nil {
 		connLogger.Infof("Error opening OutputHost connection: %v", err)
 		return nil, err
@@ -340,7 +340,7 @@ func (c *consumerImpl) createOutputHostConnection(tchanHostPort string, connKey 
 	return conn, nil
 }
 
-func (c *consumerImpl) getAcknowledger(token string) (*outputHostConnection, deliveryID, error) {
+func (c *consumerImpl) getAcknowledger(token string) (*OutputHostConnection, deliveryID, error) {
 	id, err := newDeliveryID(token)
 	if err != nil {
 		return nil, deliveryID{}, err

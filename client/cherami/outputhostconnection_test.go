@@ -68,7 +68,7 @@ func (s *OutputHostConnectionSuite) TestOutputHostBasic() {
 		AckId: common.StringPtr("test"),
 	}), nil)
 
-	conn.open()
+	conn.Open()
 	s.True(conn.isOpened(), "Connection not opened.")
 
 	delivery := <-messagesCh
@@ -87,7 +87,7 @@ func (s *OutputHostConnectionSuite) TestReadFailed() {
 	stream.On("Read").Return(nil, errors.New("some error"))
 	stream.On("Done").Return(nil)
 
-	conn.open()
+	conn.Open()
 	s.True(conn.isOpened(), "Connection not opened.")
 
 	time.Sleep(10 * time.Millisecond)
@@ -103,7 +103,7 @@ func (s *OutputHostConnectionSuite) TestReadEOF() {
 	stream.On("Read").Return(nil, io.EOF)
 	stream.On("Done").Return(nil)
 
-	conn.open()
+	conn.Open()
 	s.True(conn.isOpened(), "Connection not opened.")
 
 	time.Sleep(10 * time.Millisecond)
@@ -127,7 +127,7 @@ func (s *OutputHostConnectionSuite) TestCreditsRenewSuccess() {
 		AckId: common.StringPtr("test"),
 	}), nil)
 
-	conn.open()
+	conn.Open()
 	s.True(conn.isOpened(), "Connection not opened.")
 
 	for i := 0; i < int(conn.creditBatchSize); i++ {
@@ -156,7 +156,7 @@ func (s *OutputHostConnectionSuite) TestInitialCreditsWriteFailed() {
 	}), nil)
 	stream.On("Done").Return(nil)
 
-	conn.open()
+	conn.Open()
 	s.True(conn.isOpened(), "Connection not opened.")
 
 	time.Sleep(20 * time.Millisecond)
@@ -178,7 +178,7 @@ func (s *OutputHostConnectionSuite) TestInitialCreditsFlushFailed() {
 	stream.On("Flush").Return(errors.New("some error"))
 	stream.On("Done").Return(nil)
 
-	conn.open()
+	conn.Open()
 	s.True(conn.isOpened(), "Connection not opened.")
 
 	time.Sleep(20 * time.Millisecond)
@@ -212,7 +212,7 @@ func (s *OutputHostConnectionSuite) TestRenewCreditsFailed() {
 	}), nil)
 	stream.On("Done").Return(nil)
 
-	conn.open()
+	conn.Open()
 	s.True(conn.isOpened(), "Connection not opened.")
 
 	halfBatch := int(conn.creditBatchSize) / 2
@@ -246,7 +246,7 @@ func (s *OutputHostConnectionSuite) TestRenewCreditsFailed() {
 	s.True(atomic.LoadInt64(&rate) <= int64(conn.creditBatchSize)+int64(testPrefetchSize), fmt.Sprintf("rate was %v", atomic.LoadInt64(&rate)))
 }
 
-func createOutputHostConnection() (*outputHostConnection, *mc.MockTChanBOutClient, *mc.MockBOutOpenConsumerStreamOutCall, chan Delivery) {
+func createOutputHostConnection() (*OutputHostConnection, *mc.MockTChanBOutClient, *mc.MockBOutOpenConsumerStreamOutCall, chan Delivery) {
 	host := "testHost"
 	ackClient := new(mc.MockTChanBOutClient)
 	wsConnector := new(mc.MockWSConnector)
@@ -256,7 +256,7 @@ func createOutputHostConnection() (*outputHostConnection, *mc.MockTChanBOutClien
 	options := &ClientOptions{Timeout: time.Minute}
 
 	wsConnector.On("OpenConsumerStream", mock.Anything, mock.Anything).Return(stream, nil)
-	conn := newOutputHostConnection(
+	conn := NewOutputHostConnection(
 		ackClient,
 		wsConnector,
 		"/test/outputhostconnection",
