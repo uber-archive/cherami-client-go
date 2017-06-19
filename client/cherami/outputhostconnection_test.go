@@ -62,7 +62,7 @@ func (s *OutputHostConnectionSuite) SetupTest() {
 // wait for given 'timeout' (in milliseconds) for condition 'cond' to satisfy
 func waitFor(timeout time.Duration, cond func() bool) bool {
 
-	timeoutMs := int(timeout * time.Millisecond)
+	timeoutMs := int(timeout / time.Millisecond)
 
 	for i := 0; i < timeoutMs/10; i++ {
 		if cond() {
