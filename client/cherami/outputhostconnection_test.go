@@ -59,6 +59,20 @@ func (s *OutputHostConnectionSuite) SetupTest() {
 	s.Assertions = require.New(s.T()) // Have to define our overridden assertions in the test setup. If we did it earlier, s.T() will return nil
 }
 
+// wait for given 'timeout' (in milliseconds) for condition 'cond' to satisfy
+func waitFor(timeout time.Duration, cond func() bool) bool {
+
+	timeoutMs := int(timeout * time.Millisecond)
+
+	for i := 0; i < timeoutMs/10; i++ {
+		if cond() {
+			return true
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	return false
+}
+
 func (s *OutputHostConnectionSuite) TestOutputHostBasic() {
 	conn, _, stream, messagesCh := createOutputHostConnection()
 
@@ -69,7 +83,7 @@ func (s *OutputHostConnectionSuite) TestOutputHostBasic() {
 	}), nil)
 
 	conn.open()
-	s.True(conn.isOpened(), "Connection not opened.")
+	s.True(waitFor(time.Second, conn.isOpened), "Connection not opened.")
 
 	delivery := <-messagesCh
 	s.NotNil(delivery, "Delivery cannot be nil.")
@@ -88,11 +102,8 @@ func (s *OutputHostConnectionSuite) TestReadFailed() {
 	stream.On("Done").Return(nil)
 
 	conn.open()
-	s.True(conn.isOpened(), "Connection not opened.")
-
-	time.Sleep(10 * time.Millisecond)
-
-	s.True(conn.isClosed(), "Connection not opened.")
+	s.True(waitFor(time.Second, conn.isOpened), "Connection not opened")
+	s.True(waitFor(time.Second, conn.isClosed), "Connection not closed")
 }
 
 func (s *OutputHostConnectionSuite) TestReadEOF() {
@@ -104,11 +115,8 @@ func (s *OutputHostConnectionSuite) TestReadEOF() {
 	stream.On("Done").Return(nil)
 
 	conn.open()
-	s.True(conn.isOpened(), "Connection not opened.")
-
-	time.Sleep(10 * time.Millisecond)
-
-	s.True(conn.isClosed(), "Connection not opened.")
+	s.True(waitFor(time.Second, conn.isOpened), "Connection not opened")
+	s.True(waitFor(time.Second, conn.isClosed), "Connection not closed")
 }
 
 func (s *OutputHostConnectionSuite) TestCreditsRenewSuccess() {
@@ -128,7 +136,7 @@ func (s *OutputHostConnectionSuite) TestCreditsRenewSuccess() {
 	}), nil)
 
 	conn.open()
-	s.True(conn.isOpened(), "Connection not opened.")
+	s.True(waitFor(time.Second, conn.isOpened), "Connection not opened.")
 
 	for i := 0; i < int(conn.creditBatchSize); i++ {
 		delivery := <-messagesCh
@@ -139,7 +147,7 @@ func (s *OutputHostConnectionSuite) TestCreditsRenewSuccess() {
 		s.Equal("test", msg.GetAckId())
 	}
 
-	time.Sleep(10 * time.Millisecond)
+	time.Sleep(time.Second)
 
 	stream.AssertExpectations(s.T())
 }
@@ -157,10 +165,8 @@ func (s *OutputHostConnectionSuite) TestInitialCreditsWriteFailed() {
 	stream.On("Done").Return(nil)
 
 	conn.open()
-	s.True(conn.isOpened(), "Connection not opened.")
-
-	time.Sleep(20 * time.Millisecond)
-	s.True(conn.isClosed(), "Connection not closed.")
+	s.True(waitFor(time.Second, conn.isOpened), "Connection not opened.")
+	s.True(waitFor(time.Second, conn.isClosed), "Connection not closed.")
 
 	stream.AssertExpectations(s.T())
 }
@@ -179,10 +185,8 @@ func (s *OutputHostConnectionSuite) TestInitialCreditsFlushFailed() {
 	stream.On("Done").Return(nil)
 
 	conn.open()
-	s.True(conn.isOpened(), "Connection not opened.")
-
-	time.Sleep(20 * time.Millisecond)
-	s.True(conn.isClosed(), "Connection not closed.")
+	s.True(waitFor(time.Second, conn.isOpened), "Connection not opened.")
+	s.True(waitFor(time.Second, conn.isClosed), "Connection not closed.")
 
 	stream.AssertExpectations(s.T())
 }
@@ -213,7 +217,7 @@ func (s *OutputHostConnectionSuite) TestRenewCreditsFailed() {
 	stream.On("Done").Return(nil)
 
 	conn.open()
-	s.True(conn.isOpened(), "Connection not opened.")
+	s.True(waitFor(time.Second, conn.isOpened), "Connection not opened.")
 
 	halfBatch := int(conn.creditBatchSize) / 2
 	for i := 0; i < int(conn.creditBatchSize); i++ {
@@ -236,8 +240,7 @@ func (s *OutputHostConnectionSuite) TestRenewCreditsFailed() {
 	}
 	s.True(atomic.LoadInt64(&localCreditsLastVal) < int64(conn.creditBatchSize))
 
-	time.Sleep(10 * time.Millisecond)
-	s.True(conn.isClosed(), "Connection not closed.")
+	s.True(waitFor(time.Second, conn.isClosed), "Connection not closed.")
 
 	stream.AssertExpectations(s.T())
 
