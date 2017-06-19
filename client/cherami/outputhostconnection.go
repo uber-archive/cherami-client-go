@@ -148,7 +148,8 @@ func (conn *outputHostConnection) open() error {
 	return nil
 }
 
-func (conn *outputHostConnection) close() {
+// stop initiates tear-down of the go-routines after sending a 'closed' reconfigure event
+func (conn *outputHostConnection) stop() {
 
 	if atomic.CompareAndSwapInt32(&conn.closed, 0, 1) {
 		select {
@@ -160,9 +161,15 @@ func (conn *outputHostConnection) close() {
 		close(conn.closeChannel)
 		conn.closeAcksBatchCh() // necessary to shutdown writeAcksPump within the connection
 
-		conn.wg.Wait() // wait for the goroutines to finish up
 		conn.logger.Info("Output host connection closed.")
 	}
+}
+
+// close stops the go-routines and waits until they are done
+func (conn *outputHostConnection) close() {
+
+	conn.stop()
+	conn.wg.Wait()
 }
 
 func (conn *outputHostConnection) isOpened() bool {
@@ -210,7 +217,7 @@ func (conn *outputHostConnection) readMessagesPump() {
 			// Error reading from stream.  Time to close and bail out.
 			conn.logger.Infof("Error reading OutputHost Message Stream: %v", err)
 			// Stream is closed.  Close the connection and bail out
-			conn.close()
+			conn.stop()
 			return
 		}
 
@@ -255,7 +262,7 @@ func (conn *outputHostConnection) writeCreditsPump() {
 	if err := conn.sendCredits(int32(conn.prefetchSize)); err != nil {
 		conn.logger.Infof("Error sending initialCredits to OutputHost: %v", err)
 
-		conn.close()
+		conn.stop()
 		return
 	}
 
@@ -267,8 +274,7 @@ func (conn *outputHostConnection) writeCreditsPump() {
 			//conn.logger.Infof("Sending credits to output host: %v", credits)
 			if err := conn.sendCredits(credits); err != nil {
 				conn.logger.Infof("Error sending creditBatchSize to OutputHost: %v", err)
-
-				conn.close()
+				conn.stop()
 			}
 		case <-conn.closeChannel:
 			conn.logger.Info("WriteCreditsPump closing due to connection closed.")
