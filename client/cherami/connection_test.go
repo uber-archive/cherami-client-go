@@ -222,9 +222,8 @@ func (s *ConnectionSuite) TestClientDrain() {
 	requestDone := make(chan *PublisherReceipt, 1)
 
 	messagesCh <- putMessageRequest{message, requestDone}
-	<-time.After(10 * time.Millisecond)
 	// we must have drained and so closed must return true
-	s.True(conn.isClosed())
+	s.True(waitFor(time.Second, conn.isClosed()))
 }
 
 func (s *ConnectionSuite) TestClientClosed() {
