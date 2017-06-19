@@ -56,9 +56,10 @@ type (
 		logger            bark.Logger
 		reporter          metrics.Reporter
 
-		opened int32
-		closed int32
-		wg     sync.WaitGroup
+		opened     int32
+		closed     int32
+		streamDone int32
+		wg         sync.WaitGroup
 
 		// We need this lock to protect writes to acksBatchCh after it getting closed
 		acksBatchLk     sync.RWMutex
@@ -180,6 +181,10 @@ func (conn *outputHostConnection) isClosed() bool {
 	return atomic.LoadInt32(&conn.closed) != 0
 }
 
+func (conn *outputHostConnection) isStreamDone() bool {
+	return atomic.LoadInt32(&conn.streamDone) != 0
+}
+
 // drainReadPipe reads and discards all messages on
 // the outputHostStream until it encounters
 // a read stream error
@@ -255,6 +260,7 @@ func (conn *outputHostConnection) writeCreditsPump() {
 			conn.cancel()
 		}
 		conn.outputHostStream.Done()
+		atomic.StoreInt32(&conn.streamDone, 1)
 		conn.wg.Done()
 	}()
 
