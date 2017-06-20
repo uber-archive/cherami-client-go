@@ -58,6 +58,7 @@ type (
 		connections    map[string]*outputHostConnection
 		wsConnector    WSConnector
 		reconfigurable *reconfigurable
+		wg             sync.WaitGroup
 	}
 
 	deliveryID struct {
@@ -157,7 +158,8 @@ func (c *consumerImpl) Open(deliveryCh chan Delivery) (chan Delivery, error) {
 		c.reporter.UpdateGauge(metrics.ConsumeNumConnections, nil, int64(len(c.connections)))
 
 		c.reconfigurable = newReconfigurable(c.reconfigureCh, c.closingCh, c.reconfigureConsumer, c.logger, c.options.ReconfigurationPollingInterval)
-		go c.reconfigurable.reconfigurePump()
+		c.wg.Add(1)
+		go c.reconfigurable.reconfigurePump(&c.wg)
 
 		c.opened = true
 	}
@@ -166,18 +168,14 @@ func (c *consumerImpl) Open(deliveryCh chan Delivery) (chan Delivery, error) {
 }
 
 func (c *consumerImpl) Close() {
-	// TODO: ideally this should be synchronized, i.e. wait until all
-	// connections are properly shutdown, so that we make sure that
-	// nothing gets written to c.deliveyCh afterwards, because owner of that
-	// channel would likely close it after Close() returns.
-	if atomic.CompareAndSwapInt32(&c.isClosing, 0, 1) {
-		close(c.closingCh)
-	} else {
+
+	if !atomic.CompareAndSwapInt32(&c.isClosing, 0, 1) {
 		return
 	}
 
+	close(c.closingCh)
+
 	c.lk.Lock()
-	defer c.lk.Unlock()
 	if c.connections != nil {
 		for _, outputHostConn := range c.connections {
 			outputHostConn.close()
@@ -187,9 +185,13 @@ func (c *consumerImpl) Close() {
 
 	if c.ackConnection != nil {
 		c.ackConnection.Close()
+		c.ackConnection = nil
 	}
 
 	c.opened = false
+	c.lk.Unlock()
+
+	c.wg.Wait()
 }
 
 func (c *consumerImpl) Pause() {

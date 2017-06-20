@@ -59,6 +59,28 @@ func (s *OutputHostConnectionSuite) SetupTest() {
 	s.Assertions = require.New(s.T()) // Have to define our overridden assertions in the test setup. If we did it earlier, s.T() will return nil
 }
 
+// wait for given 'timeout' (in milliseconds) for condition 'cond' to satisfy
+func waitFor(timeout time.Duration, cond func() bool) bool {
+
+	var timeoutAt = time.Now().Add(timeout)
+	var sleep = 10 * time.Millisecond // wait 10ms between each check
+
+	if timeout < sleep {
+		sleep = timeout / 2
+	}
+
+	for !cond() {
+
+		if time.Now().After(timeoutAt) {
+			return false
+		}
+
+		time.Sleep(sleep)
+	}
+
+	return true
+}
+
 func (s *OutputHostConnectionSuite) TestOutputHostBasic() {
 	conn, _, stream, messagesCh := createOutputHostConnection()
 
@@ -69,7 +91,7 @@ func (s *OutputHostConnectionSuite) TestOutputHostBasic() {
 	}), nil)
 
 	conn.open()
-	s.True(conn.isOpened(), "Connection not opened.")
+	s.True(waitFor(time.Second, conn.isOpened), "Connection not opened.")
 
 	delivery := <-messagesCh
 	s.NotNil(delivery, "Delivery cannot be nil.")
@@ -88,11 +110,10 @@ func (s *OutputHostConnectionSuite) TestReadFailed() {
 	stream.On("Done").Return(nil)
 
 	conn.open()
-	s.True(conn.isOpened(), "Connection not opened.")
-
-	time.Sleep(10 * time.Millisecond)
-
-	s.True(conn.isClosed(), "Connection not opened.")
+	s.True(waitFor(time.Second, conn.isOpened), "Connection not opened")
+	s.True(waitFor(time.Second, conn.isClosed), "Connection not closed")
+	waitFor(time.Second, conn.isStreamDone)
+	stream.AssertExpectations(s.T())
 }
 
 func (s *OutputHostConnectionSuite) TestReadEOF() {
@@ -104,11 +125,10 @@ func (s *OutputHostConnectionSuite) TestReadEOF() {
 	stream.On("Done").Return(nil)
 
 	conn.open()
-	s.True(conn.isOpened(), "Connection not opened.")
-
-	time.Sleep(10 * time.Millisecond)
-
-	s.True(conn.isClosed(), "Connection not opened.")
+	s.True(waitFor(time.Second, conn.isOpened), "Connection not opened")
+	s.True(waitFor(time.Second, conn.isClosed), "Connection not closed")
+	waitFor(time.Second, conn.isStreamDone)
+	stream.AssertExpectations(s.T())
 }
 
 func (s *OutputHostConnectionSuite) TestCreditsRenewSuccess() {
@@ -125,10 +145,12 @@ func (s *OutputHostConnectionSuite) TestCreditsRenewSuccess() {
 	stream.On("Flush").Return(nil)
 	stream.On("Read").Return(wrapMessageInCommand(&cherami.ConsumerMessage{
 		AckId: common.StringPtr("test"),
-	}), nil)
+	}), nil).Times(int(conn.creditBatchSize))
+	stream.On("Read").Return(nil, io.EOF).Once()
+	stream.On("Done").Return(nil)
 
 	conn.open()
-	s.True(conn.isOpened(), "Connection not opened.")
+	s.True(waitFor(time.Second, conn.isOpened), "Connection not opened.")
 
 	for i := 0; i < int(conn.creditBatchSize); i++ {
 		delivery := <-messagesCh
@@ -139,8 +161,7 @@ func (s *OutputHostConnectionSuite) TestCreditsRenewSuccess() {
 		s.Equal("test", msg.GetAckId())
 	}
 
-	time.Sleep(10 * time.Millisecond)
-
+	waitFor(time.Second, conn.isStreamDone)
 	stream.AssertExpectations(s.T())
 }
 
@@ -157,11 +178,10 @@ func (s *OutputHostConnectionSuite) TestInitialCreditsWriteFailed() {
 	stream.On("Done").Return(nil)
 
 	conn.open()
-	s.True(conn.isOpened(), "Connection not opened.")
+	s.True(waitFor(time.Second, conn.isOpened), "Connection not opened.")
+	s.True(waitFor(time.Second, conn.isClosed), "Connection not closed.")
 
-	time.Sleep(20 * time.Millisecond)
-	s.True(conn.isClosed(), "Connection not closed.")
-
+	waitFor(time.Second, conn.isStreamDone)
 	stream.AssertExpectations(s.T())
 }
 
@@ -179,11 +199,9 @@ func (s *OutputHostConnectionSuite) TestInitialCreditsFlushFailed() {
 	stream.On("Done").Return(nil)
 
 	conn.open()
-	s.True(conn.isOpened(), "Connection not opened.")
-
-	time.Sleep(20 * time.Millisecond)
-	s.True(conn.isClosed(), "Connection not closed.")
-
+	s.True(waitFor(time.Second, conn.isOpened), "Connection not opened.")
+	s.True(waitFor(time.Second, conn.isClosed), "Connection not closed.")
+	waitFor(time.Second, conn.isStreamDone)
 	stream.AssertExpectations(s.T())
 }
 
@@ -213,7 +231,7 @@ func (s *OutputHostConnectionSuite) TestRenewCreditsFailed() {
 	stream.On("Done").Return(nil)
 
 	conn.open()
-	s.True(conn.isOpened(), "Connection not opened.")
+	s.True(waitFor(time.Second, conn.isOpened), "Connection not opened.")
 
 	halfBatch := int(conn.creditBatchSize) / 2
 	for i := 0; i < int(conn.creditBatchSize); i++ {
@@ -236,9 +254,8 @@ func (s *OutputHostConnectionSuite) TestRenewCreditsFailed() {
 	}
 	s.True(atomic.LoadInt64(&localCreditsLastVal) < int64(conn.creditBatchSize))
 
-	time.Sleep(10 * time.Millisecond)
-	s.True(conn.isClosed(), "Connection not closed.")
-
+	s.True(waitFor(time.Second, conn.isClosed), "Connection not closed.")
+	waitFor(time.Second, conn.isStreamDone)
 	stream.AssertExpectations(s.T())
 
 	s.InDelta(int64(time.Second+time.Microsecond), atomic.LoadInt64(&latency), float64(time.Second))

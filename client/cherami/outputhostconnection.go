@@ -56,9 +56,10 @@ type (
 		logger            bark.Logger
 		reporter          metrics.Reporter
 
-		lk     sync.Mutex
-		opened int32
-		closed int32
+		opened     int32
+		closed     int32
+		streamDone int32
+		wg         sync.WaitGroup
 
 		// We need this lock to protect writes to acksBatchCh after it getting closed
 		acksBatchLk     sync.RWMutex
@@ -108,10 +109,8 @@ func newOutputHostConnection(ackClient cherami.TChanBOut, wsConnector WSConnecto
 }
 
 func (conn *outputHostConnection) open() error {
-	conn.lk.Lock()
-	defer conn.lk.Unlock()
 
-	if atomic.LoadInt32(&conn.opened) == 0 {
+	if atomic.CompareAndSwapInt32(&conn.opened, 0, 1) {
 		switch conn.protocol {
 		case cherami.Protocol_WS:
 			conn.logger.Infof("Using websocket to connect to output host %s", conn.connKey)
@@ -132,26 +131,28 @@ func (conn *outputHostConnection) open() error {
 		}
 
 		// Now start the message pump
+		conn.wg.Add(1)
 		go conn.readMessagesPump()
+
+		conn.wg.Add(1)
 		go conn.writeCreditsPump()
 		// We only bail out of this pump when acksBatchCh is closed by consumerImpl after this connections is removed.
 		// This is the only guarantee we will not receive more acks on the channel and it is safe to shutdown the pump.
 		// Closing the pump earlier has the potential to cause deadlock between consumer writing acks and connection writing
 		// messages to deliveryCh.
+		conn.wg.Add(1)
 		go conn.writeAcksPump()
 
-		atomic.StoreInt32(&conn.opened, 1)
 		conn.logger.Info("Output host connection opened.")
 	}
 
 	return nil
 }
 
-func (conn *outputHostConnection) close() {
-	conn.lk.Lock()
-	defer conn.lk.Unlock()
+// stop initiates tear-down of the go-routines after sending a 'closed' reconfigure event
+func (conn *outputHostConnection) stop() {
 
-	if atomic.LoadInt32(&conn.closed) == 0 {
+	if atomic.CompareAndSwapInt32(&conn.closed, 0, 1) {
 		select {
 		case conn.reconfigureCh <- reconfigureInfo{eventType: connClosedReconfigureType, reconfigureID: conn.connKey}:
 		default:
@@ -160,9 +161,16 @@ func (conn *outputHostConnection) close() {
 
 		close(conn.closeChannel)
 		conn.closeAcksBatchCh() // necessary to shutdown writeAcksPump within the connection
-		atomic.StoreInt32(&conn.closed, 1)
+
 		conn.logger.Info("Output host connection closed.")
 	}
+}
+
+// close stops the go-routines and waits until they are done
+func (conn *outputHostConnection) close() {
+
+	conn.stop()
+	conn.wg.Wait()
 }
 
 func (conn *outputHostConnection) isOpened() bool {
@@ -171,6 +179,10 @@ func (conn *outputHostConnection) isOpened() bool {
 
 func (conn *outputHostConnection) isClosed() bool {
 	return atomic.LoadInt32(&conn.closed) != 0
+}
+
+func (conn *outputHostConnection) isStreamDone() bool {
+	return atomic.LoadInt32(&conn.streamDone) != 0
 }
 
 // drainReadPipe reads and discards all messages on
@@ -188,6 +200,7 @@ func (conn *outputHostConnection) readMessagesPump() {
 
 	defer func() {
 		conn.logger.Info("readMessagesPump done")
+		conn.wg.Done()
 	}()
 
 	var localCredits int32
@@ -209,7 +222,7 @@ func (conn *outputHostConnection) readMessagesPump() {
 			// Error reading from stream.  Time to close and bail out.
 			conn.logger.Infof("Error reading OutputHost Message Stream: %v", err)
 			// Stream is closed.  Close the connection and bail out
-			conn.close()
+			conn.stop()
 			return
 		}
 
@@ -247,13 +260,15 @@ func (conn *outputHostConnection) writeCreditsPump() {
 			conn.cancel()
 		}
 		conn.outputHostStream.Done()
+		atomic.StoreInt32(&conn.streamDone, 1)
+		conn.wg.Done()
 	}()
 
 	// Send initial credits to OutputHost
 	if err := conn.sendCredits(int32(conn.prefetchSize)); err != nil {
 		conn.logger.Infof("Error sending initialCredits to OutputHost: %v", err)
 
-		conn.close()
+		conn.stop()
 		return
 	}
 
@@ -265,8 +280,7 @@ func (conn *outputHostConnection) writeCreditsPump() {
 			//conn.logger.Infof("Sending credits to output host: %v", credits)
 			if err := conn.sendCredits(credits); err != nil {
 				conn.logger.Infof("Error sending creditBatchSize to OutputHost: %v", err)
-
-				conn.close()
+				conn.stop()
 			}
 		case <-conn.closeChannel:
 			conn.logger.Info("WriteCreditsPump closing due to connection closed.")
@@ -276,6 +290,9 @@ func (conn *outputHostConnection) writeCreditsPump() {
 }
 
 func (conn *outputHostConnection) writeAcksPump() {
+
+	defer conn.wg.Done()
+
 	var buffer []string
 	var bufferTicker <-chan time.Time
 	var err error

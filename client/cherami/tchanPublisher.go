@@ -127,7 +127,7 @@ func (p *tchannelBatchPublisher) Open() error {
 	p.reporter.UpdateGauge(metrics.PublishNumConnections, nil, int64(len(hostAddrs)))
 
 	p.reconfigurable = newReconfigurable(p.reconfigureCh, p.closeCh, p.reconfigureHandler, p.logger, p.reconfigurationPollingInterval)
-	go p.reconfigurable.reconfigurePump()
+	go p.reconfigurable.reconfigurePump(nil)
 	go p.processor()
 	atomic.StoreInt32(&p.opened, 1)
 	p.logger.WithField(`endpoints`, endpoints.addrs).Info("Publisher Opened.")

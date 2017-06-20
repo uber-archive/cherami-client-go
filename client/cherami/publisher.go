@@ -139,7 +139,7 @@ func (s *publisherImpl) Open() error {
 		s.reporter.UpdateGauge(metrics.PublishNumConnections, nil, int64(len(s.connections)))
 
 		s.reconfigurable = newReconfigurable(s.reconfigureCh, s.closingCh, s.reconfigurePublisher, s.logger, s.reconfigurationPollingInterval)
-		go s.reconfigurable.reconfigurePump()
+		go s.reconfigurable.reconfigurePump(nil)
 
 		s.opened = true
 		s.logger.Info("Publisher Opened.")

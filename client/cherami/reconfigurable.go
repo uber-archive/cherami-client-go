@@ -21,6 +21,7 @@
 package cherami
 
 import (
+	"sync"
 	"time"
 
 	"github.com/uber-common/bark"
@@ -68,7 +69,14 @@ func newReconfigurable(reconfigureCh <-chan reconfigureInfo, closingCh chan stru
 	return r
 }
 
-func (s *reconfigurable) reconfigurePump() {
+func (s *reconfigurable) reconfigurePump(wg *sync.WaitGroup) {
+
+	defer func() {
+		if wg != nil {
+			wg.Done()
+		}
+	}()
+
 	s.logger.Info("Reconfiguration pump started.")
 	heartbeat := time.NewTicker(s.pollingInterval)
 	limiter := time.NewTicker(limiterDuration)
