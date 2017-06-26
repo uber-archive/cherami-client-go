@@ -1,5 +1,5 @@
-hash: e81effd1b4925df77951f652ceb2693e674ef707142ce3c19b6476614ac7105e
-updated: 2017-06-14T14:35:29.763277784-07:00
+hash: f3c5c9d41e2a4488875add435c8888783aea859f6d511e9dc3922bfcf0fc7e04
+updated: 2017-06-26T11:42:17.789559473-07:00
 imports:
 - name: github.com/apache/thrift
   version: b8ee72de5bf9318d50846852082325d0f932682b
@@ -42,7 +42,7 @@ imports:
 - name: github.com/uber-go/atomic
   version: 0506d69f5564c56e25797bf7183c28921d4c6360
 - name: github.com/uber/cherami-thrift
-  version: be4d5fc25dbf54affd1d8be5bf49bd3fc0440330
+  version: ff1036378813f6390b305bfe68eb18530315498d
   subpackages:
   - .generated/go/cherami
 - name: github.com/uber/tchannel-go
