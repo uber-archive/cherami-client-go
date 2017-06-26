@@ -1,7 +1,7 @@
 package: github.com/uber/cherami-client-go
 import:
 - package: github.com/uber/cherami-thrift
-  version: v1.20.0
+  version: v1.22.0-rc1
   subpackages:
   - .generated/go/cherami
 - package: github.com/sirupsen/logrus
