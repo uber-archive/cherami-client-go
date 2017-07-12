@@ -1,33 +1,33 @@
-hash: f3c5c9d41e2a4488875add435c8888783aea859f6d511e9dc3922bfcf0fc7e04
-updated: 2017-06-26T11:42:17.789559473-07:00
+hash: 8bf341d9f666d7dc138a093870484b1d4212baf59d33d72083a6eda44612dd73
+updated: 2017-07-12T15:17:54.505951435-07:00
 imports:
 - name: github.com/apache/thrift
-  version: b8ee72de5bf9318d50846852082325d0f932682b
+  version: b2a4d4ae21c789b689dd162deb819665567f481c
   subpackages:
   - lib/go/thrift
 - name: github.com/cactus/go-statsd-client
-  version: 1139cdac1a56e404b5382e3a3503a2c587d2c0c3
+  version: ad551ee7f9f3465fb1ce1695899c612f7808a06a
   subpackages:
   - statsd
 - name: github.com/davecgh/go-spew
-  version: 346938d642f2ec3594ed81d874461961cd0faa76
+  version: adab96458c51a58dc1783b3335dcce5461522e75
   subpackages:
   - spew
 - name: github.com/gorilla/websocket
   version: 3ab3a8b8831546bd18fd182c20687ca853b2bb13
 - name: github.com/opentracing/opentracing-go
-  version: eaaf4e1eeb7a5373b38e70901270c83577dc6fb9
+  version: 1949ddbfd147afd4d964a9f00b24eb291e0e7c38
   subpackages:
   - ext
   - log
 - name: github.com/pborman/uuid
-  version: e790cca94e6cc75c7064b1332e63811d4aae1a53
+  version: a97ce2ca70fa5a848076093f05e639a89ca34d06
 - name: github.com/pmezard/go-difflib
   version: 792786c7400a136282c1664665ae0a8db921c6c2
   subpackages:
   - difflib
 - name: github.com/sirupsen/logrus
-  version: 85b1699d505667d13f8ac4478c1debbf85d6c5de
+  version: ba1b36c82c5e05c4f912a88eab0dcd91a171688f
 - name: github.com/stretchr/objx
   version: 1a9d0bb9f541897e62256577b352fdbc1fb4fd94
 - name: github.com/stretchr/testify
@@ -38,7 +38,7 @@ imports:
   - require
   - suite
 - name: github.com/uber-common/bark
-  version: dbf558e8a7b65e2b54e1e01c14ee0e4207a865f5
+  version: a2ce12437502dbd1511a6ab87745ed01ba138dbb
 - name: github.com/uber-go/atomic
   version: 0506d69f5564c56e25797bf7183c28921d4c6360
 - name: github.com/uber/cherami-thrift
@@ -60,7 +60,7 @@ imports:
   - trand
   - typed
 - name: golang.org/x/net
-  version: ddf80d0970594e2e4cccf5a98861cad3d9eaa4cd
+  version: f01ecb60fe3835d80d9a0b7b2bf24b228c89260e
   subpackages:
   - bpf
   - context
@@ -69,7 +69,7 @@ imports:
   - ipv4
   - ipv6
 - name: golang.org/x/sys
-  version: 0b25a408a50076fbbcae6b7ac0ea5fbb0b085e79
+  version: d4feaf1a7e61e1d9e79e6c4e76c6349e9cab0a03
   subpackages:
   - unix
 testImports: []
