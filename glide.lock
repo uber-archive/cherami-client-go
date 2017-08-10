@@ -1,12 +1,12 @@
-hash: e761689bc31272a166b7ca7fba314d44d23407ebc2dae80a5855c3459d132a2c
-updated: 2017-08-07T13:50:27.395593789-07:00
+hash: 4131117be2feccbdbabf6e07e00ab56ed3830c77daf4c6dd3c74fc1c5b7477ec
+updated: 2017-08-10T14:19:42.847352127-07:00
 imports:
 - name: github.com/apache/thrift
   version: b2a4d4ae21c789b689dd162deb819665567f481c
   subpackages:
   - lib/go/thrift
 - name: github.com/cactus/go-statsd-client
-  version: ad551ee7f9f3465fb1ce1695899c612f7808a06a
+  version: 1139cdac1a56e404b5382e3a3503a2c587d2c0c3
   subpackages:
   - statsd
 - name: github.com/davecgh/go-spew
@@ -16,7 +16,7 @@ imports:
 - name: github.com/gorilla/websocket
   version: 3ab3a8b8831546bd18fd182c20687ca853b2bb13
 - name: github.com/opentracing/opentracing-go
-  version: 8ebe5d4e236eed9fd88e593c288bfb804d630b8c
+  version: eaaf4e1eeb7a5373b38e70901270c83577dc6fb9
   subpackages:
   - ext
   - log
@@ -27,7 +27,7 @@ imports:
   subpackages:
   - difflib
 - name: github.com/sirupsen/logrus
-  version: 181d419aa9e2223811b824e8f0b4af96f9ba9302
+  version: 85b1699d505667d13f8ac4478c1debbf85d6c5de
 - name: github.com/stretchr/objx
   version: 1a9d0bb9f541897e62256577b352fdbc1fb4fd94
 - name: github.com/stretchr/testify
@@ -38,15 +38,15 @@ imports:
   - require
   - suite
 - name: github.com/uber-common/bark
-  version: dbf558e8a7b65e2b54e1e01c14ee0e4207a865f5
+  version: a2ce12437502dbd1511a6ab87745ed01ba138dbb
 - name: github.com/uber-go/atomic
-  version: 70bd1261d36be490ebd22a62b385a3c5d23b6240
+  version: 0506d69f5564c56e25797bf7183c28921d4c6360
 - name: github.com/uber/cherami-thrift
-  version: ff1036378813f6390b305bfe68eb18530315498d
+  version: 2cb0e2eeb6570800a2dd86544909bf2693f50e7b
   subpackages:
   - .generated/go/cherami
 - name: github.com/uber/tchannel-go
-  version: a7ad9ecb640b5f10a0395b38d6319175172b3ab2
+  version: b99c1d7cecb0fdc882bed0098e7cae6ec7459059
   subpackages:
   - hyperbahn
   - hyperbahn/gen-go/hyperbahn
@@ -59,10 +59,6 @@ imports:
   - tos
   - trand
   - typed
-- name: golang.org/x/crypto
-  version: 76c7c60c071b310d16774257b879b9d476db77f3
-  subpackages:
-  - ssh/terminal
 - name: golang.org/x/net
   version: f5079bd7f6f74e23c4d65efa0f4ce14cbd6a3c0f
   subpackages:
@@ -73,8 +69,7 @@ imports:
   - ipv4
   - ipv6
 - name: golang.org/x/sys
-  version: d8f5ea21b9295e315e612b4bcf4bedea93454d4d
+  version: 0b25a408a50076fbbcae6b7ac0ea5fbb0b085e79
   subpackages:
   - unix
-  - windows
 testImports: []
