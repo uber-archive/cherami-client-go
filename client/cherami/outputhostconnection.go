@@ -231,6 +231,11 @@ func (conn *outputHostConnection) readMessagesPump() {
 			msg := cmd.Message
 			delivery := newDelivery(msg, conn)
 
+			if conn.isClosed() {
+				delivery.Nack()
+				return
+			}
+
 			select {
 			case conn.deliveryCh <- delivery:
 			case <-conn.closeChannel:
