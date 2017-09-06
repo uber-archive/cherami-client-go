@@ -1,5 +1,5 @@
-hash: 4131117be2feccbdbabf6e07e00ab56ed3830c77daf4c6dd3c74fc1c5b7477ec
-updated: 2017-08-10T14:19:42.847352127-07:00
+hash: 12e7edecef2f51df4123d9f38bf980dddfa53d3212f94a51f864936c79d3dc8c
+updated: 2017-09-06T11:10:57.288770741-07:00
 imports:
 - name: github.com/apache/thrift
   version: b2a4d4ae21c789b689dd162deb819665567f481c
@@ -10,7 +10,7 @@ imports:
   subpackages:
   - statsd
 - name: github.com/davecgh/go-spew
-  version: adab96458c51a58dc1783b3335dcce5461522e75
+  version: 782f4967f2dc4564575ca782fe2d04090b5faca8
   subpackages:
   - spew
 - name: github.com/gorilla/websocket
@@ -31,7 +31,7 @@ imports:
 - name: github.com/stretchr/objx
   version: 1a9d0bb9f541897e62256577b352fdbc1fb4fd94
 - name: github.com/stretchr/testify
-  version: 05e8a0eda380579888eb53c394909df027f06991
+  version: f6abca593680b2315d2075e0f5e2a9751e3f431a
   subpackages:
   - assert
   - mock
@@ -42,32 +42,25 @@ imports:
 - name: github.com/uber-go/atomic
   version: 0506d69f5564c56e25797bf7183c28921d4c6360
 - name: github.com/uber/cherami-thrift
-  version: 2cb0e2eeb6570800a2dd86544909bf2693f50e7b
+  version: 98e566b96cbe7142446508e5991a11bc394ab343
   subpackages:
   - .generated/go/cherami
 - name: github.com/uber/tchannel-go
-  version: b99c1d7cecb0fdc882bed0098e7cae6ec7459059
+  version: 4a23f3aae76694b21107f118ece763a61b98ea07
   subpackages:
   - hyperbahn
   - hyperbahn/gen-go/hyperbahn
-  - internal/argreader
   - json
   - relay
   - thrift
   - thrift/gen-go/meta
   - tnet
-  - tos
   - trand
   - typed
 - name: golang.org/x/net
-  version: f5079bd7f6f74e23c4d65efa0f4ce14cbd6a3c0f
+  version: 057a25b06247e0c51ba15d8ae475feb2fcb72164
   subpackages:
-  - bpf
   - context
-  - internal/iana
-  - internal/socket
-  - ipv4
-  - ipv6
 - name: golang.org/x/sys
   version: 0b25a408a50076fbbcae6b7ac0ea5fbb0b085e79
   subpackages:
