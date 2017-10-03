@@ -1,5 +1,5 @@
 hash: 12e7edecef2f51df4123d9f38bf980dddfa53d3212f94a51f864936c79d3dc8c
-updated: 2017-09-06T11:10:57.288770741-07:00
+updated: 2017-10-03T17:11:29.836679932+01:00
 imports:
 - name: github.com/apache/thrift
   version: b2a4d4ae21c789b689dd162deb819665567f481c
@@ -10,7 +10,7 @@ imports:
   subpackages:
   - statsd
 - name: github.com/davecgh/go-spew
-  version: 782f4967f2dc4564575ca782fe2d04090b5faca8
+  version: a476722483882dd40b8111f0eb64e1d7f43f56e4
   subpackages:
   - spew
 - name: github.com/gorilla/websocket
@@ -31,14 +31,14 @@ imports:
 - name: github.com/stretchr/objx
   version: 1a9d0bb9f541897e62256577b352fdbc1fb4fd94
 - name: github.com/stretchr/testify
-  version: f6abca593680b2315d2075e0f5e2a9751e3f431a
+  version: 890a5c3458b43e6104ff5da8dfa139d013d77544
   subpackages:
   - assert
   - mock
   - require
   - suite
 - name: github.com/uber-common/bark
-  version: a2ce12437502dbd1511a6ab87745ed01ba138dbb
+  version: 02d883c81a4e7b76904d97efb176efdf4be791bd
 - name: github.com/uber-go/atomic
   version: 0506d69f5564c56e25797bf7183c28921d4c6360
 - name: github.com/uber/cherami-thrift
@@ -58,7 +58,7 @@ imports:
   - trand
   - typed
 - name: golang.org/x/net
-  version: 057a25b06247e0c51ba15d8ae475feb2fcb72164
+  version: 0a9397675ba34b2845f758fe3cd68828369c6517
   subpackages:
   - context
 - name: golang.org/x/sys
