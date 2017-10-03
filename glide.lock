@@ -1,35 +1,35 @@
 hash: 12e7edecef2f51df4123d9f38bf980dddfa53d3212f94a51f864936c79d3dc8c
-updated: 2017-10-03T17:01:21.120168221+01:00
+updated: 2017-10-03T17:11:29.836679932+01:00
 imports:
 - name: github.com/apache/thrift
   version: b2a4d4ae21c789b689dd162deb819665567f481c
   subpackages:
   - lib/go/thrift
 - name: github.com/cactus/go-statsd-client
-  version: ce77ca9ecdee1c3ffd097e32f9bb832825ccb203
+  version: 1139cdac1a56e404b5382e3a3503a2c587d2c0c3
   subpackages:
   - statsd
 - name: github.com/davecgh/go-spew
-  version: 04cdfd42973bb9c8589fd6a731800cf222fde1a9
+  version: a476722483882dd40b8111f0eb64e1d7f43f56e4
   subpackages:
   - spew
 - name: github.com/gorilla/websocket
   version: 3ab3a8b8831546bd18fd182c20687ca853b2bb13
 - name: github.com/opentracing/opentracing-go
-  version: 1949ddbfd147afd4d964a9f00b24eb291e0e7c38
+  version: eaaf4e1eeb7a5373b38e70901270c83577dc6fb9
   subpackages:
   - ext
   - log
 - name: github.com/pborman/uuid
   version: e790cca94e6cc75c7064b1332e63811d4aae1a53
 - name: github.com/pmezard/go-difflib
-  version: d8ed2627bdf02c080bf22230dbb337003b7aba2d
+  version: 792786c7400a136282c1664665ae0a8db921c6c2
   subpackages:
   - difflib
 - name: github.com/sirupsen/logrus
-  version: 89742aefa4b206dcf400792f3bd35b542998eb3b
+  version: 85b1699d505667d13f8ac4478c1debbf85d6c5de
 - name: github.com/stretchr/objx
-  version: cbeaeb16a013161a98496fad62933b1d21786672
+  version: 1a9d0bb9f541897e62256577b352fdbc1fb4fd94
 - name: github.com/stretchr/testify
   version: 890a5c3458b43e6104ff5da8dfa139d013d77544
   subpackages:
@@ -40,43 +40,29 @@ imports:
 - name: github.com/uber-common/bark
   version: 02d883c81a4e7b76904d97efb176efdf4be791bd
 - name: github.com/uber-go/atomic
-  version: 4e336646b2ef9fc6e47be8e21594178f98e5ebcf
-  subpackages:
-  - utils
+  version: 0506d69f5564c56e25797bf7183c28921d4c6360
 - name: github.com/uber/cherami-thrift
   version: 98e566b96cbe7142446508e5991a11bc394ab343
   subpackages:
   - .generated/go/cherami
 - name: github.com/uber/tchannel-go
-  version: 1fcf82ec86967eb43ba0baa9b964f8eb226d242e
+  version: 4a23f3aae76694b21107f118ece763a61b98ea07
   subpackages:
   - hyperbahn
   - hyperbahn/gen-go/hyperbahn
-  - internal/argreader
   - json
   - relay
   - thrift
   - thrift/gen-go/meta
   - tnet
-  - tos
   - trand
   - typed
-- name: golang.org/x/crypto
-  version: 9419663f5a44be8b34ca85f08abc5fe1be11f8a3
-  subpackages:
-  - ssh/terminal
 - name: golang.org/x/net
   version: 0a9397675ba34b2845f758fe3cd68828369c6517
   subpackages:
-  - bpf
   - context
-  - internal/iana
-  - internal/socket
-  - ipv4
-  - ipv6
 - name: golang.org/x/sys
-  version: 314a259e304ff91bd6985da2a7149bbf91237993
+  version: 0b25a408a50076fbbcae6b7ac0ea5fbb0b085e79
   subpackages:
   - unix
-  - windows
 testImports: []
