@@ -323,25 +323,12 @@ func (c *clientImpl) ReadConsumerGroupHosts(path string, consumerGroupName strin
 	ctx, cancel := c.createContext()
 	defer cancel()
 
-	var result *cherami.ReadConsumerGroupHostsResult_
-	readOp := func() error {
-		var e error
-		request := &cherami.ReadConsumerGroupHostsRequest{
-			DestinationPath:   common.StringPtr(path),
-			ConsumerGroupName: common.StringPtr(consumerGroupName),
-		}
-
-		result, e = c.client.ReadConsumerGroupHosts(ctx, request)
-
-		return e
+	request := &cherami.ReadConsumerGroupHostsRequest{
+		DestinationPath:   common.StringPtr(path),
+		ConsumerGroupName: common.StringPtr(consumerGroupName),
 	}
 
-	err := backoff.Retry(readOp, c.retryPolicy, isTransientError)
-	if err != nil {
-		return nil, err
-	}
-
-	return result, nil
+	return c.client.ReadConsumerGroupHosts(ctx, request)
 }
 
 func getFrontEndServiceName(deploymentStr string) string {
