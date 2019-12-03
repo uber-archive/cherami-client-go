@@ -3,6 +3,8 @@ Go client library for Cherami [![Build Status](https://travis-ci.org/uber/cheram
 
 [Cherami](https://eng.uber.com/cherami/) is a distributed, scalable, durable, and highly available message queue system we developed at Uber Engineering to transport asynchronous tasks.
 
+(This project is deprecated and not maintained.)
+
 `cherami-client-go` is the Go client library for Cherami.
 
 How to Use
